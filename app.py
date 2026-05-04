@@ -346,6 +346,61 @@ def cerrar_sesion():
 # ══════════════════════════════════════════════════════════════════════════════
 # VISTA: INICIO
 # ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ACTIVACIÓN DE MÉDICO
+# ══════════════════════════════════════════════════════════════════════════════
+if st.session_state.activar_medico_token:
+    token = st.session_state.activar_medico_token
+    try:
+        r = get_sb().table("medicos").select("*").eq("activation_token", token).execute()
+        medico = r.data[0] if r.data else None
+    except:
+        medico = None
+
+    navbar("Activación de cuenta médica")
+
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        if not medico:
+            st.error("❌ Enlace de activación inválido o expirado.")
+        elif medico.get("activation_token_used") and medico.get("password_set"):
+            st.warning("Este enlace ya fue usado. Iniciá sesión normalmente.")
+            if st.button("Ir al login →", use_container_width=True):
+                st.session_state.activar_medico_token = ""
+                st.session_state.vista = "medico_login"
+                st.rerun()
+        else:
+            st.markdown('<div class="art-card">', unsafe_allow_html=True)
+            st.markdown(f"### 👨‍⚕️ Hola, Dr/Dra. {medico.get('nombre','')} {medico.get('apellido','')}")
+            st.markdown('<p style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">Creá tu contraseña para acceder al panel médico de Arteris.</p>', unsafe_allow_html=True)
+            with st.form("form_activacion_medico"):
+                pwd1 = st.text_input("Contraseña", type="password", placeholder="Mínimo 8 caracteres")
+                pwd2 = st.text_input("Confirmá la contraseña", type="password")
+                ok = st.form_submit_button("Activar mi cuenta →", use_container_width=True)
+            if ok:
+                if len(pwd1) < 8:
+                    st.error("La contraseña debe tener al menos 8 caracteres.")
+                elif pwd1 != pwd2:
+                    st.error("Las contraseñas no coinciden.")
+                else:
+                    import hashlib
+                    pwd_hash = hashlib.sha256(pwd1.encode()).hexdigest()
+                    get_sb().table("medicos").update({
+                        "password_hash": pwd_hash,
+                        "password_set": True,
+                        "activation_token_used": True
+                    }).eq("activation_token", token).execute()
+                    st.session_state.medico_data = medico
+                    st.session_state.rol = "medico"
+                    st.session_state.activar_medico_token = ""
+                    st.session_state.vista = "medico_home"
+                    st.success("✅ ¡Cuenta activada! Bienvenido a Arteris.")
+                    st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+    footer()
+    st.stop()
+    
 if st.session_state.vista == "inicio":
     navbar()
     col_left, col_right = st.columns([1.2, 1], gap="large")

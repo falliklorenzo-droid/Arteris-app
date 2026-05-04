@@ -1,46 +1,43 @@
 import streamlit as st
-from supabase import create_client
+from supabase import create_client, Client
 from datetime import datetime
 
-# ── Configuración de la página ───────────────────────────────────────────────
 st.set_page_config(
     page_title="Monitor de Presión Arterial",
     page_icon="🩺",
     layout="centered"
 )
 
-# ── Conexión a Supabase ──────────────────────────────────────────────────────
-@st.cache_resource
-def conectar_supabase():
+def get_supabase() -> Client:
     url = st.secrets["supabase"]["url"]
     key = st.secrets["supabase"]["key"]
     return create_client(url, key)
 
-supabase = conectar_supabase()
-
-# ── Funciones de base de datos ───────────────────────────────────────────────
 def buscar_paciente(codigo):
-    resultado = supabase.table("pacientes")\
-        .select("*")\
-        .eq("codigo", codigo)\
-        .execute()
-    if resultado.data:
-        return resultado.data[0]
-    return None
+    try:
+        sb = get_supabase()
+        resultado = sb.table("pacientes").select("*").eq("codigo", codigo).execute()
+        if resultado.data:
+            return resultado.data[0]
+        return None
+    except Exception as e:
+        st.error(f"Error de conexión: {e}")
+        return None
 
 def registrar_paciente(codigo, nombre, apellido, edad, sexo):
-    supabase.table("pacientes").insert({
-        "codigo": codigo,
+    sb = get_supabase()
+    sb.table("pacientes").update({
         "nombre": nombre,
         "apellido": apellido,
         "edad": edad,
         "sexo": sexo,
         "consentimiento_aceptado": True,
         "fecha_registro": datetime.now().isoformat()
-    }).execute()
+    }).eq("codigo", codigo).execute()
 
 def guardar_medicion(codigo, sistolica, diastolica):
-    supabase.table("mediciones").insert({
+    sb = get_supabase()
+    sb.table("mediciones").insert({
         "codigo_paciente": codigo,
         "sistolica": sistolica,
         "diastolica": diastolica,
@@ -48,11 +45,8 @@ def guardar_medicion(codigo, sistolica, diastolica):
     }).execute()
 
 def obtener_mediciones(codigo):
-    resultado = supabase.table("mediciones")\
-        .select("*")\
-        .eq("codigo_paciente", codigo)\
-        .order("fecha")\
-        .execute()
+    sb = get_supabase()
+    resultado = sb.table("mediciones").select("*").eq("codigo_paciente", codigo).order("fecha").execute()
     return resultado.data
 
 def calcular_resultado(prom_sis, prom_dia):
@@ -65,11 +59,10 @@ def calcular_resultado(prom_sis, prom_dia):
     else:
         return "🔴 Hipertensión grado 2", "Tenés hipertensión de grado 2. Debés consultar con tu médico urgentemente.", "error"
 
-# ── Interfaz principal ───────────────────────────────────────────────────────
+# ── Interfaz ─────────────────────────────────────────────────────────────────
 st.title("🩺 Monitor de Presión Arterial")
 st.markdown("---")
 
-# Leer código desde la URL
 params = st.query_params
 codigo_url = params.get("codigo", "")
 
@@ -78,7 +71,7 @@ if "codigo_paciente" not in st.session_state:
 if "consentimiento_dado" not in st.session_state:
     st.session_state.consentimiento_dado = False
 
-# ── Pantalla 1: Ingresar código ──────────────────────────────────────────────
+# ── Pantalla 1: Ingresar código ───────────────────────────────────────────────
 if not st.session_state.codigo_paciente:
     st.subheader("Ingresá tu código de acceso")
     codigo_input = st.text_input("Código proporcionado por tu médico:")
@@ -93,7 +86,7 @@ if not st.session_state.codigo_paciente:
         else:
             st.error("Por favor ingresá un código.")
 
-# ── Pantallas siguientes ─────────────────────────────────────────────────────
+# ── Pantallas siguientes ──────────────────────────────────────────────────────
 else:
     codigo = st.session_state.codigo_paciente
     paciente = buscar_paciente(codigo)
@@ -104,7 +97,7 @@ else:
             st.session_state.codigo_paciente = ""
             st.rerun()
 
-    # Sub-pantalla A: Consentimiento informado
+    # Consentimiento informado
     elif not paciente.get("consentimiento_aceptado", False) and not st.session_state.consentimiento_dado:
         st.subheader("📄 Consentimiento informado")
         st.info("""
@@ -115,11 +108,11 @@ Esta plataforma recopila y almacena los siguientes datos personales:
 - Valores de presión arterial durante 7 días
 
 **¿Para qué se usan tus datos?**
-Únicamente para calcular el promedio de tu presión arterial y mostrarte un resultado orientativo. 
+Únicamente para calcular el promedio de tu presión arterial y mostrarte un resultado orientativo.
 Tus datos son accesibles solo por vos y tu médico tratante.
 
 **Tus derechos (Ley 25.326):**
-Tenés derecho a acceder, rectificar y suprimir tus datos personales en cualquier momento, 
+Tenés derecho a acceder, rectificar y suprimir tus datos personales en cualquier momento,
 comunicándote con tu médico tratante.
 
 ⚠️ *Esta plataforma no reemplaza la consulta médica profesional.*
@@ -129,8 +122,8 @@ comunicándote con tu médico tratante.
             st.session_state.consentimiento_dado = True
             st.rerun()
 
-    # Sub-pantalla B: Registro de datos personales
-    elif paciente.get("nombre", "") == "":
+    # Registro de datos personales
+    elif not paciente.get("nombre"):
         st.subheader("📋 Registro de datos personales")
         st.info("Es tu primera vez. Por favor completá tus datos.")
         with st.form("form_registro"):
@@ -147,7 +140,7 @@ comunicándote con tu médico tratante.
             else:
                 st.error("Por favor completá nombre y apellido.")
 
-    # Sub-pantalla C: Carga de mediciones
+    # Carga de mediciones
     else:
         nombre_paciente = paciente.get("nombre", "Paciente")
         st.subheader(f"Hola, {nombre_paciente} 👋")
@@ -177,7 +170,7 @@ comunicándote con tu médico tratante.
 
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("Promedio sistólica",  f"{prom_sis:.0f} mmHg")
+                st.metric("Promedio sistólica", f"{prom_sis:.0f} mmHg")
             with col2:
                 st.metric("Promedio diastólica", f"{prom_dia:.0f} mmHg")
 

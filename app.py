@@ -211,7 +211,7 @@ def enviar_bienvenida_paciente(nombre, email, codigo):
         resend.api_key = st.secrets["resend"]["api_key"]
         url = f"https://arteris-app.streamlit.app/?codigo={codigo}"
         resend.Emails.send({
-            "from": "Arteris <onboarding@resend.dev>",
+            "from": "Arteris <noreply@arterismed.com>",
             "to": email,
             "subject": "Tu acceso a Arteris · Monitor de Presión Arterial",
             "html": f"""
@@ -474,7 +474,7 @@ elif st.session_state.vista == "paciente_login":
                         try:
                             resend.api_key = st.secrets["resend"]["api_key"]
                             resend.Emails.send({
-                                "from": "Arteris <onboarding@resend.dev>",
+                                "from": "Arteris <noreply@arterismed.com>",
                                 "to": email_reset,
                                 "subject": "Recuperá tu contraseña de Arteris",
                                 "html": f'<p>Hacé clic para crear una nueva contraseña: <a href="{reset_url}">{reset_url}</a></p>'

@@ -240,15 +240,14 @@ def enviar_bienvenida_paciente(nombre, email, codigo):
 def enviar_activacion_medico(nombre, email):
     try:
         resend.api_key = st.secrets["resend"]["api_key"]
-        sb = get_sb()
-        r = sb.auth.admin.generate_link({
-            "type": "magiclink",
-            "email": email,
-            "options": {"redirect_to": "https://arteris-app.streamlit.app/?vista=medico"}
-        })
-        link = r.properties.action_link if hasattr(r, 'properties') else "https://arteris-app.streamlit.app/?vista=medico"
+        token = str(uuid.uuid4())
+        get_sb().table("medicos").update({
+            "activation_token": token,
+            "activation_token_used": False
+        }).eq("email", email).execute()
+        link = f"https://arteris-app.streamlit.app/?activar_medico={token}"
         resend.Emails.send({
-            "from": "Arteris <onboarding@resend.dev>",
+            "from": "Arteris <noreply@arterismed.com>",
             "to": email,
             "subject": "Activá tu cuenta médica en Arteris",
             "html": f"""
@@ -263,6 +262,7 @@ def enviar_activacion_medico(nombre, email):
                 <div style="text-align:center;margin:32px 0;">
                   <a href="{link}" style="background:#1d4ed8;color:white;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:15px;display:inline-block;">Activar cuenta médica →</a>
                 </div>
+                <p style="font-size:12px;color:#475569;">O copiá: {link}</p>
                 <hr style="border-color:rgba(255,255,255,0.08);margin:24px 0;">
                 <p style="font-size:11px;color:#475569;">Si no solicitaste este acceso, ignorá este email.</p>
               </div>

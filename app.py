@@ -1,68 +1,59 @@
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
-import pandas as pd
-import uuid
+from supabase import create_client
 from datetime import datetime
 
-# ── Configuración de la página ──────────────────────────────────────────────
+# ── Configuración de la página ───────────────────────────────────────────────
 st.set_page_config(
     page_title="Monitor de Presión Arterial",
     page_icon="🩺",
     layout="centered"
 )
 
-# ── Conexión a Google Sheets ─────────────────────────────────────────────────
+# ── Conexión a Supabase ──────────────────────────────────────────────────────
 @st.cache_resource
-def conectar_sheets():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
-    client = gspread.authorize(creds)
-    return client
+def conectar_supabase():
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    return create_client(url, key)
 
-# ── Funciones principales ────────────────────────────────────────────────────
-def obtener_hoja(nombre):
-    client = conectar_sheets()
-    spreadsheet = client.open(st.secrets["sheets"]["nombre_planilla"])
-    try:
-        return spreadsheet.worksheet(nombre)
-    except:
-        return spreadsheet.add_worksheet(title=nombre, rows=1000, cols=20)
+supabase = conectar_supabase()
 
-def buscar_paciente_por_codigo(codigo):
-    hoja = obtener_hoja("pacientes")
-    registros = hoja.get_all_records()
-    for r in registros:
-        if str(r.get("codigo", "")).strip() == str(codigo).strip():
-            return r
+# ── Funciones de base de datos ───────────────────────────────────────────────
+def buscar_paciente(codigo):
+    resultado = supabase.table("pacientes")\
+        .select("*")\
+        .eq("codigo", codigo)\
+        .execute()
+    if resultado.data:
+        return resultado.data[0]
     return None
 
 def registrar_paciente(codigo, nombre, apellido, edad, sexo):
-    hoja = obtener_hoja("pacientes")
-    registros = hoja.get_all_records()
-    if not registros:
-        hoja.append_row(["codigo", "nombre", "apellido", "edad", "sexo", "registrado"])
-    hoja.append_row([codigo, nombre, apellido, edad, sexo,
-                     datetime.now().strftime("%Y-%m-%d %H:%M")])
+    supabase.table("pacientes").insert({
+        "codigo": codigo,
+        "nombre": nombre,
+        "apellido": apellido,
+        "edad": edad,
+        "sexo": sexo,
+        "consentimiento_aceptado": True,
+        "fecha_registro": datetime.now().isoformat()
+    }).execute()
 
 def guardar_medicion(codigo, sistolica, diastolica):
-    hoja = obtener_hoja("mediciones")
-    registros = hoja.get_all_records()
-    if not registros:
-        hoja.append_row(["codigo", "sistolica", "diastolica", "fecha"])
-    hoja.append_row([codigo, sistolica, diastolica,
-                     datetime.now().strftime("%Y-%m-%d %H:%M")])
+    supabase.table("mediciones").insert({
+        "codigo_paciente": codigo,
+        "sistolica": sistolica,
+        "diastolica": diastolica,
+        "fecha": datetime.now().isoformat()
+    }).execute()
 
 def obtener_mediciones(codigo):
-    hoja = obtener_hoja("mediciones")
-    registros = hoja.get_all_records()
-    return [r for r in registros if str(r.get("codigo", "")) == str(codigo)]
+    resultado = supabase.table("mediciones")\
+        .select("*")\
+        .eq("codigo_paciente", codigo)\
+        .order("fecha")\
+        .execute()
+    return resultado.data
 
 def calcular_resultado(prom_sis, prom_dia):
     if prom_sis < 120 and prom_dia < 80:
@@ -78,14 +69,14 @@ def calcular_resultado(prom_sis, prom_dia):
 st.title("🩺 Monitor de Presión Arterial")
 st.markdown("---")
 
-# Leer código desde la URL o input manual
+# Leer código desde la URL
 params = st.query_params
 codigo_url = params.get("codigo", "")
 
 if "codigo_paciente" not in st.session_state:
     st.session_state.codigo_paciente = codigo_url
-if "paciente" not in st.session_state:
-    st.session_state.paciente = None
+if "consentimiento_dado" not in st.session_state:
+    st.session_state.consentimiento_dado = False
 
 # ── Pantalla 1: Ingresar código ──────────────────────────────────────────────
 if not st.session_state.codigo_paciente:
@@ -93,18 +84,53 @@ if not st.session_state.codigo_paciente:
     codigo_input = st.text_input("Código proporcionado por tu médico:")
     if st.button("Ingresar"):
         if codigo_input:
-            st.session_state.codigo_paciente = codigo_input.strip()
-            st.rerun()
+            paciente = buscar_paciente(codigo_input.strip())
+            if paciente is None:
+                st.error("❌ Código inválido. Verificá el código que te dio tu médico.")
+            else:
+                st.session_state.codigo_paciente = codigo_input.strip()
+                st.rerun()
         else:
             st.error("Por favor ingresá un código.")
 
-# ── Pantalla 2: Registro o medición ─────────────────────────────────────────
+# ── Pantallas siguientes ─────────────────────────────────────────────────────
 else:
     codigo = st.session_state.codigo_paciente
-    paciente = buscar_paciente_por_codigo(codigo)
+    paciente = buscar_paciente(codigo)
 
-    # Sub-pantalla A: Registro de datos personales
     if paciente is None:
+        st.error("❌ Código inválido. Volvé al inicio.")
+        if st.button("Volver al inicio"):
+            st.session_state.codigo_paciente = ""
+            st.rerun()
+
+    # Sub-pantalla A: Consentimiento informado
+    elif not paciente.get("consentimiento_aceptado", False) and not st.session_state.consentimiento_dado:
+        st.subheader("📄 Consentimiento informado")
+        st.info("""
+**Antes de continuar, leé atentamente:**
+
+Esta plataforma recopila y almacena los siguientes datos personales:
+- Nombre, apellido, edad y sexo biológico
+- Valores de presión arterial durante 7 días
+
+**¿Para qué se usan tus datos?**
+Únicamente para calcular el promedio de tu presión arterial y mostrarte un resultado orientativo. 
+Tus datos son accesibles solo por vos y tu médico tratante.
+
+**Tus derechos (Ley 25.326):**
+Tenés derecho a acceder, rectificar y suprimir tus datos personales en cualquier momento, 
+comunicándote con tu médico tratante.
+
+⚠️ *Esta plataforma no reemplaza la consulta médica profesional.*
+        """)
+        aceptar = st.checkbox("Leí y acepto el uso de mis datos personales según lo descrito arriba")
+        if st.button("Continuar", disabled=not aceptar):
+            st.session_state.consentimiento_dado = True
+            st.rerun()
+
+    # Sub-pantalla B: Registro de datos personales
+    elif paciente.get("nombre", "") == "":
         st.subheader("📋 Registro de datos personales")
         st.info("Es tu primera vez. Por favor completá tus datos.")
         with st.form("form_registro"):
@@ -115,13 +141,13 @@ else:
             enviado  = st.form_submit_button("Registrarme")
         if enviado:
             if nombre and apellido:
-                registrar_paciente(codigo, nombre, apellido, edad, sexo)
-                st.success("¡Registro exitoso! Podés empezar a cargar tus mediciones.")
+                registrar_paciente(codigo, nombre, apellido, int(edad), sexo)
+                st.success("¡Registro exitoso!")
                 st.rerun()
             else:
                 st.error("Por favor completá nombre y apellido.")
 
-    # Sub-pantalla B: Carga de mediciones
+    # Sub-pantalla C: Carga de mediciones
     else:
         nombre_paciente = paciente.get("nombre", "Paciente")
         st.subheader(f"Hola, {nombre_paciente} 👋")
@@ -134,23 +160,27 @@ else:
             st.markdown("### Cargar medición de hoy")
             with st.form("form_medicion"):
                 st.caption("Ingresá los valores tal como aparecen en tu tensiómetro")
-                sistolica  = st.number_input("Presión sistólica (número mayor)", 
-                                              min_value=60, max_value=250, step=1)
-                diastolica = st.number_input("Presión diastólica (número menor)", 
-                                              min_value=40, max_value=150, step=1)
+                sistolica  = st.number_input("Presión sistólica (número mayor)",
+                                              min_value=60, max_value=250, step=1, value=120)
+                diastolica = st.number_input("Presión diastólica (número menor)",
+                                              min_value=40, max_value=150, step=1, value=80)
                 enviado = st.form_submit_button("Guardar medición")
             if enviado:
                 guardar_medicion(codigo, sistolica, diastolica)
                 st.success("✅ Medición guardada correctamente.")
                 st.rerun()
         else:
-            # Mostrar resultado final
             st.markdown("### 🎯 Resultado de tus 7 días")
-            prom_sis = sum(int(m["sistolica"])  for m in mediciones) / 7
-            prom_dia = sum(int(m["diastolica"]) for m in mediciones) / 7
+            prom_sis = sum(m["sistolica"]  for m in mediciones) / 7
+            prom_dia = sum(m["diastolica"] for m in mediciones) / 7
             titulo, mensaje, tipo = calcular_resultado(prom_sis, prom_dia)
-            st.metric("Promedio sistólica",  f"{prom_sis:.0f} mmHg")
-            st.metric("Promedio diastólica", f"{prom_dia:.0f} mmHg")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Promedio sistólica",  f"{prom_sis:.0f} mmHg")
+            with col2:
+                st.metric("Promedio diastólica", f"{prom_dia:.0f} mmHg")
+
             if tipo == "success":
                 st.success(f"**{titulo}** — {mensaje}")
             elif tipo == "warning":
@@ -160,5 +190,8 @@ else:
 
             st.markdown("---")
             st.markdown("#### Historial de mediciones")
-            df = pd.DataFrame(mediciones)[["fecha","sistolica","diastolica"]]
-            st.dataframe(df, use_container_width=True)
+            for m in mediciones:
+                st.write(f"📅 {m['fecha'][:10]} — Sistólica: {m['sistolica']} / Diastólica: {m['diastolica']}")
+
+        st.markdown("---")
+        st.caption("⚠️ Esta plataforma es orientativa y no reemplaza la consulta médica profesional.")

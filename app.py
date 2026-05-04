@@ -237,20 +237,17 @@ header { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Logo SVG ──────────────────────────────────────────────────────────────────
-LOGO_SVG = """
-<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="36" height="36" rx="9" fill="#1d4ed8"/>
-  <path d="M4 20 L9 20 L12 13 L15 25 L18 9 L21 22 L24 16 L27 20 L32 20"
-        stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-</svg>
-"""
+
 
 def navbar(subtitulo=""):
     st.markdown(f"""
     <div class="arteris-nav">
         <div class="logo-wrap">
-            {LOGO_SVG}
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="36" height="36" rx="9" fill="#1d4ed8"/>
+              <path d="M4 20 L9 20 L12 13 L15 25 L18 9 L21 22 L24 16 L27 20 L32 20"
+                    stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
             <div>
                 <div class="logo-text">Arteri<span>s</span></div>
                 <div class="logo-tag">Monitor de Presión Arterial</div>

@@ -334,6 +334,8 @@ if "paciente_data" not in st.session_state:
     st.session_state.paciente_data = None
 if "consentimiento_ok" not in st.session_state:
     st.session_state.consentimiento_ok = False
+if "activar_medico_token" not in st.session_state:
+    st.session_state.activar_medico_token = params.get("activar_medico", "")
 
 def cerrar_sesion():
     for k in ["vista","usuario","rol","medico_data","paciente_data","codigo_paciente","consentimiento_ok"]:

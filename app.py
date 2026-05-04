@@ -248,9 +248,9 @@ def navbar(subtitulo=""):
               <path d="M4 20 L9 20 L12 13 L15 25 L18 9 L21 22 L24 16 L27 20 L32 20"
                     stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
             </svg>
-            <div>
-                <div class="logo-text">Arteri<span>s</span></div>
-                <div class="logo-tag">Monitor de Presión Arterial</div>
+           <div style="display:flex;flex-direction:column;justify-content:center;line-height:1.2;">
+                <div class="logo-text" style="margin:0;padding:0;">Arteri<span>s</span></div>
+                <div class="logo-tag" style="margin:0;padding:0;">Monitor de Presión Arterial</div>
             </div>
         </div>
         <div style="font-size:13px;color:#64748b;">{subtitulo}</div>

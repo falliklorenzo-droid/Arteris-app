@@ -16,23 +16,48 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display:ital@0;1&display=swap');
+
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif !important;
     background-color: #0a1628 !important;
     color: #e8eef7 !important;
 }
-.stApp { background-color: #0a1628 !important; }
+.stApp {
+    background-color: #0a1628 !important;
+    min-height: 100vh;
+}
 section[data-testid="stSidebar"] { display: none; }
+
+/* Full width layout */
+.block-container {
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}
+.main > div {
+    padding: 0 !important;
+}
+
+/* Inner content padding */
+.art-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Navbar */
 .arteris-nav {
     background: rgba(10,22,40,0.98);
     border-bottom: 1px solid rgba(59,130,246,0.2);
     padding: 0 2rem;
-    height: 60px;
+    height: 64px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    position: relative;
-    margin: -1rem -1rem 2rem -1rem;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    width: 100%;
 }
 .arteris-nav::after {
     content: '';
@@ -42,37 +67,102 @@ section[data-testid="stSidebar"] { display: none; }
     background: linear-gradient(90deg, #1d4ed8, #3b82f6, #06b6d4, transparent);
 }
 .logo-wrap { display: flex; align-items: center; gap: 10px; }
-.logo-text { font-family: 'DM Serif Display', serif; font-size: 24px; color: #e8eef7; letter-spacing: -0.5px; }
+.logo-text { font-family: 'DM Serif Display', serif; font-size: 26px; color: #e8eef7; letter-spacing: -0.5px; }
 .logo-text span { color: #3b82f6; }
 .logo-tag { font-size: 10px; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
-.art-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(59,130,246,0.15); border-radius: 16px; padding: 1.5rem; margin-bottom: 1rem; }
-.art-card-white { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
-.art-metric { text-align: center; padding: 1rem; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; }
-.art-metric-num { font-family: 'DM Serif Display', serif; font-size: 36px; color: #3b82f6; line-height: 1; }
-.art-metric-label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+/* Cards */
+.art-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(59,130,246,0.15);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+}
+.art-card-white {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+.art-metric {
+    text-align: center;
+    padding: 1.25rem;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+}
+.art-metric-num { font-family: 'DM Serif Display', serif; font-size: 40px; color: #3b82f6; line-height: 1; }
+.art-metric-label { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+/* Badges */
 .badge-ok { background: rgba(34,197,94,0.12); color: #22c55e; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
 .badge-warn { background: rgba(234,179,8,0.12); color: #eab308; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
 .badge-alert { background: rgba(239,68,68,0.12); color: #ef4444; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
-.stButton > button { background: #1d4ed8 !important; color: white !important; border: none !important; border-radius: 8px !important; font-family: 'DM Sans', sans-serif !important; font-size: 14px !important; padding: 0.5rem 1.5rem !important; }
+
+/* Buttons */
+.stButton > button {
+    background: #1d4ed8 !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 15px !important;
+    padding: 0.6rem 1.5rem !important;
+    width: 100%;
+}
 .stButton > button:hover { background: #1e40af !important; }
-.art-progress-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 6px; overflow: hidden; margin: 8px 0; }
+
+/* Progress */
+.art-progress-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 8px; overflow: hidden; margin: 8px 0; }
 .art-progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1d4ed8, #06b6d4); }
-.day-dots { display: flex; gap: 8px; margin: 12px 0; }
-.day-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; }
+
+/* Day dots */
+.day-dots { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.day-dot { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
 .day-done { background: rgba(59,130,246,0.2); color: #3b82f6; }
 .day-today { background: #1d4ed8; color: white; }
 .day-pending { background: rgba(255,255,255,0.05); color: #475569; }
-.section-eyebrow { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #3b82f6; margin-bottom: 6px; }
-.section-title { font-family: 'DM Serif Display', serif; font-size: 28px; color: #e8eef7; margin-bottom: 8px; line-height: 1.2; }
-.section-sub { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 1.5rem; }
-.arteris-footer { background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.06); padding: 2rem; margin: 3rem -1rem -1rem -1rem; }
-.inst-badge { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 14px; font-size: 11px; color: #64748b; }
-.footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; font-size: 11px; color: #475569; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+/* Typography */
+.section-eyebrow { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #3b82f6; margin-bottom: 8px; }
+.section-title { font-family: 'DM Serif Display', serif; font-size: 36px; color: #e8eef7; margin-bottom: 12px; line-height: 1.2; }
+.section-sub { font-size: 15px; color: #94a3b8; line-height: 1.7; margin-bottom: 1.5rem; }
+
+/* Footer */
+.arteris-footer {
+    background: rgba(0,0,0,0.4);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 2rem 2rem 1.5rem;
+    width: 100%;
+    margin-top: auto;
+}
+.inst-badge { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 14px; font-size: 11px; color: #64748b; display: inline-block; margin: 4px; }
+.footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; margin-top: 1rem; font-size: 11px; color: #475569; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+/* Hide streamlit defaults */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
 header { visibility: hidden; }
-.block-container { padding-top: 0 !important; max-width: 1100px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .arteris-nav { padding: 0 1rem; height: 56px; }
+    .logo-text { font-size: 20px; }
+    .logo-tag { display: none; }
+    .section-title { font-size: 26px; }
+    .art-metric-num { font-size: 28px; }
+    .art-content { padding: 1rem; }
+    .day-dot { width: 30px; height: 30px; font-size: 10px; }
+}
+@media (max-width: 480px) {
+    .section-title { font-size: 22px; }
+    .art-card { padding: 1rem; }
+}
 </style>
+""", unsafe_allow_html=True)
+
 """, unsafe_allow_html=True)
 
 # ── Componentes UI ────────────────────────────────────────────────────────────

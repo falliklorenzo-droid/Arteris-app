@@ -541,6 +541,87 @@ if st.session_state.vista == "inicio":
 # ══════════════════════════════════════════════════════════════════════════════
 # VISTA: LOGIN PACIENTE
 # ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# VISTA: AJUSTES PACIENTE
+# ══════════════════════════════════════════════════════════════════════════════
+elif st.session_state.vista == "paciente_ajustes":
+    paciente = st.session_state.paciente_data
+    if not paciente:
+        st.session_state.vista = "paciente_login"
+        st.rerun()
+
+    nombre = paciente.get("nombre", "Paciente")
+    navbar(f"Ajustes · {nombre}")
+
+    col_nav1, col_nav2 = st.columns([6,1])
+    with col_nav2:
+        with st.popover("⚙️ " + nombre[:10]):
+            st.markdown(f'<p style="font-size:13px;color:#94a3b8;margin-bottom:8px;">Sesión activa como<br><strong style="color:#e8eef7;">{nombre}</strong></p>', unsafe_allow_html=True)
+            st.divider()
+            if st.button("🏠 Inicio", use_container_width=True):
+                st.session_state.vista = "paciente_home"
+                st.rerun()
+            if st.button("🚪 Cerrar sesión", use_container_width=True):
+                cerrar_sesion()
+
+    st.markdown("### ⚙️ Ajustes de tu cuenta")
+    st.markdown("---")
+
+    col1, col2 = st.columns([1,1], gap="large")
+
+    with col1:
+        st.markdown('<div class="art-card">', unsafe_allow_html=True)
+        st.markdown("#### 📧 Recordatorios por email")
+        st.markdown('<p style="font-size:13px;color:#94a3b8;">Recibirás un recordatorio para cargar tu presión arterial a las 10am y a las 6pm cada día.</p>', unsafe_allow_html=True)
+        recordatorios_actual = paciente.get("recordatorios_email", True)
+        nuevo_valor = st.toggle("Activar recordatorios por email", value=recordatorios_actual)
+        if nuevo_valor != recordatorios_actual:
+            actualizar_paciente(paciente["codigo"], {"recordatorios_email": nuevo_valor})
+            st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
+            st.success("✅ Preferencia guardada.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('<div class="art-card">', unsafe_allow_html=True)
+        st.markdown("#### 🔐 Cambiar contraseña")
+        with st.form("form_cambiar_pwd"):
+            pwd_actual = st.text_input("Contraseña actual", type="password")
+            pwd_nueva  = st.text_input("Nueva contraseña", type="password", placeholder="Mínimo 8 caracteres")
+            pwd_conf   = st.text_input("Confirmá la nueva contraseña", type="password")
+            cambiar    = st.form_submit_button("Cambiar contraseña", use_container_width=True)
+        if cambiar:
+            import hashlib
+            hash_actual = hashlib.sha256(pwd_actual.encode()).hexdigest()
+            if hash_actual != paciente.get("password_hash"):
+                st.error("❌ La contraseña actual es incorrecta.")
+            elif len(pwd_nueva) < 8:
+                st.error("La nueva contraseña debe tener al menos 8 caracteres.")
+            elif pwd_nueva != pwd_conf:
+                st.error("Las contraseñas no coinciden.")
+            else:
+                nuevo_hash = hashlib.sha256(pwd_nueva.encode()).hexdigest()
+                actualizar_paciente(paciente["codigo"], {"password_hash": nuevo_hash})
+                st.success("✅ Contraseña actualizada correctamente.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="art-card" style="margin-top:1rem;">', unsafe_allow_html=True)
+    st.markdown("#### 👤 Mis datos personales")
+    col_d1, col_d2, col_d3 = st.columns(3)
+    with col_d1:
+        st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:24px;">{paciente.get("edad","—")}</div><div class="art-metric-label">Edad</div></div>', unsafe_allow_html=True)
+    with col_d2:
+        st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:18px;">{paciente.get("sexo","—")}</div><div class="art-metric-label">Sexo biológico</div></div>', unsafe_allow_html=True)
+    with col_d3:
+        med_txt = paciente.get("medicacion","Ninguna") or "Ninguna"
+        st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:16px;">{med_txt}</div><div class="art-metric-label">Medicación</div></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.button("← Volver al inicio", use_container_width=False):
+        st.session_state.vista = "paciente_home"
+        st.rerun()
+
+    footer()
+    
 elif st.session_state.vista == "paciente_login":
     navbar("Portal del paciente")
     col1, col2, col3 = st.columns([1,2,1])

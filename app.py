@@ -567,21 +567,35 @@ elif st.session_state.vista == "paciente_home":
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
             st.markdown('<div class="art-card">', unsafe_allow_html=True)
-            st.markdown("### 📄 Consentimiento informado")
+            st.markdown("### 📄 Consentimiento y términos de uso")
             st.markdown("""
-<div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:1.25rem;font-size:13px;color:#94a3b8;line-height:1.7;">
+<div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:1.25rem;font-size:13px;color:#94a3b8;line-height:1.7;max-height:300px;overflow-y:auto;">
+<strong style="color:#e8eef7;font-size:14px;">Consentimiento informado</strong><br><br>
 <strong style="color:#e8eef7;">Datos que almacenamos:</strong><br>
 - Nombre, apellido, edad y sexo biológico<br>
 - Medicación actual y dosis<br>
 - Valores de presión arterial durante 7 días<br><br>
 <strong style="color:#e8eef7;">Uso de los datos:</strong><br>
-Únicamente para calcular el promedio de tu presión arterial. Solo vos y tu médico pueden verlos.<br><br>
+Tus datos se utilizan únicamente para calcular el promedio de tu presión arterial y mostrarte un resultado orientativo. Solo vos y tu médico tratante pueden acceder a tu información.<br><br>
 <strong style="color:#e8eef7;">Tus derechos (Ley 25.326):</strong><br>
-Podés acceder, rectificar y suprimir tus datos contactando a tu médico.
+Tenés derecho a acceder, rectificar y suprimir tus datos personales en cualquier momento contactando a tu médico tratante.<br><br>
+<hr style="border-color:rgba(255,255,255,0.08);margin:12px 0;">
+<strong style="color:#e8eef7;font-size:14px;">Términos y condiciones de uso</strong><br><br>
+<strong style="color:#e8eef7;">Naturaleza del servicio:</strong><br>
+Arteris es una plataforma de monitoreo orientativo. Los resultados que proporciona <strong style="color:#e8eef7;">no constituyen un diagnóstico médico</strong> y no reemplazan la consulta con un profesional de la salud.<br><br>
+<strong style="color:#e8eef7;">Responsabilidad:</strong><br>
+El usuario asume la responsabilidad de ingresar datos correctos. Arteris no se responsabiliza por decisiones médicas tomadas en base a los resultados de la plataforma.<br><br>
+<strong style="color:#e8eef7;">Recordatorios por email:</strong><br>
+Si el usuario lo autoriza, recibirá recordatorios por email únicamente para cargar sus mediciones de presión arterial. Estos emails no contienen publicidad ni información de terceros.<br><br>
+<strong style="color:#e8eef7;">Seguridad:</strong><br>
+Los datos se almacenan de forma segura y cifrada. No se comparten con terceros bajo ninguna circunstancia.
 </div>
             """, unsafe_allow_html=True)
-            aceptar = st.checkbox("Leí y acepto el uso de mis datos personales")
-            if st.button("Continuar →", use_container_width=True, disabled=not aceptar):
+            st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
+            aceptar_consentimiento = st.checkbox("Leí y acepto el consentimiento informado y el uso de mis datos personales")
+            aceptar_terminos = st.checkbox("Leí y acepto los términos y condiciones de uso de Arteris")
+            ambos = aceptar_consentimiento and aceptar_terminos
+            if st.button("Continuar →", use_container_width=True, disabled=not ambos):
                 st.session_state.consentimiento_ok = True
                 actualizar_paciente(codigo, {"consentimiento_aceptado": True})
                 st.rerun()

@@ -559,8 +559,14 @@ elif st.session_state.vista == "paciente_home":
 
     col_nav1, col_nav2 = st.columns([6,1])
     with col_nav2:
-        if st.button("Cerrar sesión"):
-            cerrar_sesion()
+        with st.popover("⚙️ " + nombre[:10]):
+            st.markdown(f'<p style="font-size:13px;color:#94a3b8;margin-bottom:8px;">Sesión activa como<br><strong style="color:#e8eef7;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
+            st.divider()
+            if st.button("⚙️ Ajustes", use_container_width=True):
+                st.session_state.vista = "paciente_ajustes"
+                st.rerun()
+            if st.button("🚪 Cerrar sesión", use_container_width=True):
+                cerrar_sesion()
 
     # Consentimiento
     if not paciente.get("consentimiento_aceptado") and not st.session_state.consentimiento_ok:
@@ -808,10 +814,15 @@ elif st.session_state.vista == "medico_home":
         st.rerun()
 
     navbar(f"Dr/Dra. {medico.get('nombre','')} {medico.get('apellido','')}")
+   
     col_nav1, col_nav2 = st.columns([6,1])
     with col_nav2:
-        if st.button("Cerrar sesión"):
-            cerrar_sesion()
+        nombre_med = medico.get('nombre', '')
+        with st.popover("⚙️ " + nombre_med[:10]):
+            st.markdown(f'<p style="font-size:13px;color:#94a3b8;margin-bottom:8px;">Dr/Dra.<br><strong style="color:#e8eef7;">{medico.get("nombre","")} {medico.get("apellido","")}</strong></p>', unsafe_allow_html=True)
+            st.divider()
+            if st.button("🚪 Cerrar sesión", use_container_width=True):
+                cerrar_sesion()
 
     tab1, tab2 = st.tabs(["➕ Nuevo paciente", "📋 Mis pacientes"])
 

@@ -596,12 +596,14 @@ Podés acceder, rectificar y suprimir tus datos contactando a tu médico.
             with st.form("form_registro"):
                 edad = st.number_input("Edad", min_value=1, max_value=120, step=1)
                 sexo = st.selectbox("Sexo biológico", ["Femenino", "Masculino", "Otro"])
-                toma_med = st.radio("¿Tomás medicación para la presión?", ["No", "Sí"], horizontal=True)
-                medicacion = dosis = ""
+                toma_med = st.radio("¿Tomás medicación para la presión arterial?", ["No", "Sí"], horizontal=True)
+                medicacion = ""
+                dosis = ""
                 if toma_med == "Sí":
-                    medicacion = st.text_input("¿Qué medicación?", placeholder="Ej: Enalapril")
+                    medicacion = st.text_input("¿Qué medicación tomás?", placeholder="Ej: Enalapril")
                     dosis = st.text_input("¿Cuál es la dosis?", placeholder="Ej: 10mg cada 12hs")
-                recordatorios = st.checkbox("Quiero recibir recordatorios por email", value=True)
+                recordatorios = st.checkbox("✉️ Quiero recibir recordatorios por email para cargar mi presión arterial", value=True)
+                st.markdown('<div style="font-size:11px;color:#64748b;margin-top:-8px;">Recibirás un recordatorio a las 10am y a las 6pm cada día durante los 7 días del seguimiento.</div>', unsafe_allow_html=True)
                 enviado = st.form_submit_button("Guardar y comenzar →", use_container_width=True)
             if enviado and edad:
                 actualizar_paciente(codigo, {

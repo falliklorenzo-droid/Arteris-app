@@ -35,17 +35,9 @@ section[data-testid="stSidebar"] { display: none; }
     margin: 0 auto !important;
 }
 .arteris-nav {
-    margin-bottom: 0 !important;
+    margin-bottom: 3rem !important;
 }
-.main .block-container > div:first-child {
-    padding: 0 !important;
-}
-/* Contenido interior centrado */
-.art-inner {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 2rem;
-}
+
 
 /* Navbar */
 .arteris-nav {
@@ -56,11 +48,6 @@ section[data-testid="stSidebar"] { display: none; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 999;
-    width: 100%;
-    z-index: 9999;
 }
 .arteris-nav::after {
     content: '';

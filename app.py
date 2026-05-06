@@ -28,21 +28,11 @@ html, body, [class*="css"] {
 }
 section[data-testid="stSidebar"] { display: none; }
 
-/* Full width layout */
+/* Layout centrado y contenido */
 .block-container {
-    padding: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-}
-.main > div {
-    padding: 0 !important;
-}
-
-/* Inner content padding */
-.art-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 2rem;
+    padding: 1rem 2rem 0 2rem !important;
+    max-width: 900px !important;
+    margin: 0 auto !important;
 }
 
 /* Navbar */

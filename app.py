@@ -30,9 +30,20 @@ section[data-testid="stSidebar"] { display: none; }
 
 /* Layout centrado y contenido */
 .block-container {
-    padding: 1rem 2rem 0 2rem !important;
-    max-width: 900px !important;
-    margin: 0 auto !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+}
+.arteris-nav {
+    margin-bottom: 0 !important;
+}
+.main .block-container > div:first-child {
+    padding: 0 !important;
+}
+/* Contenido interior centrado */
+.art-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
 }
 
 /* Navbar */
@@ -48,6 +59,11 @@ section[data-testid="stSidebar"] { display: none; }
     top: 0;
     z-index: 999;
     width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
 }
 .arteris-nav::after {
     content: '';

@@ -124,9 +124,9 @@ section[data-testid="stSidebar"] { display: none; }
 .arteris-footer {
     background: rgba(0,0,0,0.4);
     border-top: 1px solid rgba(255,255,255,0.06);
-    padding: 2rem 2rem 1.5rem;
+    padding: 1.5rem 2rem;
     width: 100%;
-    margin-top: auto;
+    margin-top: 4rem;
 }
 .inst-badge { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 14px; font-size: 11px; color: #64748b; display: inline-block; margin: 4px; }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; margin-top: 1rem; font-size: 11px; color: #475569; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }

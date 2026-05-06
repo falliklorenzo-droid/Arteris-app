@@ -31,7 +31,7 @@ section[data-testid="stSidebar"] { display: none; }
 /* Layout centrado y contenido */
 .block-container {
     padding: 1rem 2rem 0 2rem !important;
-    max-width: 900px !important;
+    max-width: 1100px !important;
     margin: 0 auto !important;
 }
 .arteris-nav {

@@ -1,0 +1,101 @@
+﻿Evaluation of a Digital Strategy for Structured Home Blood Pressure Monitoring in a Specialized Hypertension Unit: A Prospective Intra-Subject Comparative Study.
+1. Introduction and Background
+Hypertension is one of the leading modifiable cardiovascular risk factors worldwide. It is estimated that more than one billion individuals are affected globally and that elevated blood pressure accounts for approximately 50% of deaths related to coronary heart disease and stroke.
+Despite the availability of effective antihypertensive therapies, blood pressure control remains suboptimal across most healthcare systems worldwide. Population-based registries have consistently demonstrated that fewer than half of treated hypertensive patients achieve recommended therapeutic targets.
+In Argentina, epidemiological studies such as the RENATA registry have shown that although a substantial proportion of hypertensive patients receive pharmacological treatment, blood pressure control rates remain insufficient. Furthermore, the recent 2026 Latin American Consensus Document for the Management of Patients with Hypertension and Cardio-Renal and Metabolic Disturbances highlighted the high prevalence of hypertension in Latin American countries, together with low rates of diagnosis, treatment, and control. In Argentina, hypertension prevalence exceeds 40% in both sexes. Among women with hypertension, 72% had been diagnosed, 64% were receiving treatment, and only 35% had controlled blood pressure, whereas among men, only 57% had been diagnosed, 47% treated, and merely 23% achieved blood pressure control.
+Several factors contribute to this gap, including poor population awareness, insufficient public health prevention strategies, low treatment adherence, socioeconomic barriers limiting access to healthcare systems, healthy diets, and uninterrupted medication supply, as well as therapeutic inertia and the limited availability of systematic and accessible tools for longitudinal out-of-office follow-up.
+In this context, Home Blood Pressure Monitoring (HBPM) has become a fundamental tool for the evaluation and follow-up of hypertensive patients outside the clinical setting. HBPM has demonstrated greater predictive value for cardiovascular morbidity and mortality than office blood pressure measurements.
+Multiple clinical trials and meta-analyses have shown that HBPM contributes to improved blood pressure control, particularly when integrated into structured follow-up strategies and clinical feedback interventions. Consequently, several international hypertension guidelines currently recommend the systematic use of HBPM for diagnosis, therapeutic titration, and long-term follow-up of hypertensive patients. These include the recent Latin American Consensus Document on Hypertension and Cardio-Renal and Metabolic Disturbances, recommendations from the Latin American Society of Hypertension, the European Society of Hypertension (ESH), the World Hypertension League, the American Heart Association (AHA), and the Japanese Hypertension Guidelines, among others.
+Although Ambulatory Blood Pressure Monitoring (ABPM) remains the gold standard for the diagnosis of masked hypertension, HBPM represents a valuable tool for identifying both white-coat hypertension and masked hypertension.
+Over recent years, advances in digital technologies have created new opportunities to structure and optimize HBPM implementation. Digital platforms capable of recording, organizing, and visually displaying home blood pressure measurements may facilitate monitoring procedures, improve treatment adherence, and promote timely interventions.
+However, most currently available evidence derives from complex multifactorial strategies combining telemonitoring, patient education, teleconsultation, and multidisciplinary care programs, without specifically evaluating the isolated impact of a systematic and structured HBPM strategy delivered through a digital platform and validated against the current gold standard, ABPM.
+Despite growing evidence supporting home blood pressure monitoring and the development of digital tools, HBPM remains underutilized in routine clinical practice. In particular, local data evaluating its implementation and its impact on objective blood pressure control parameters, such as ABPM, are still lacking.
+Several studies have demonstrated that integrating HBPM with remote data transmission and visualization systems improves blood pressure control by facilitating more timely clinical decision-making, reducing therapeutic inertia, and enhancing overall management. In particular, Gianfranco Parati and collaborators have emphasized that home blood pressure telemonitoring not only improves adherence to follow-up but also allows a more accurate characterization of the patient’s blood pressure profile under real-life conditions, thereby representing a key tool in modern hypertension management. Moreover, scalable and potentially cost-effective organizational models for telemonitoring implementation within healthcare systems have been proposed.
+Accordingly, the present study aims to evaluate the impact of a structured HBPM strategy using a user-friendly digital platform with remote data transmission capabilities and automated orientative alerts informing patients whether their blood pressure is controlled or uncontrolled, with the possibility of asynchronous medical feedback when requested.
+2. Primary Objective
+To evaluate changes in systolic and diastolic blood pressure measured by 24-hour ambulatory blood pressure monitoring (ABPM) between baseline and 6 months following the implementation of a structured digital strategy for standardized 7-day home blood pressure monitoring in hypertensive patients managed at a specialized hypertension unit.
+3. Secondary Objectives
+1. To evaluate the evolution of systolic and diastolic blood pressure measured by home blood pressure monitoring (HBPM) throughout follow-up. 
+2. To determine the proportion of patients with controlled blood pressure according to ABPM and HBPM criteria at baseline and after 6 months. 
+3. To assess adherence to protocolized home blood pressure monitoring during follow-up. 
+4. To analyze therapeutic modifications performed during follow-up as an indirect measure of therapeutic inertia. 
+5. To record clinical events reported during follow-up. 
+4. Hypothesis
+The implementation of a structured digital strategy for home blood pressure monitoring with automated alerts facilitates and optimizes blood pressure control in hypertensive patients, as reflected by a significant reduction in systolic and diastolic blood pressure verified by 24-hour ambulatory blood pressure monitoring (ABPM) at 6 months.
+5. Materials and Methods
+Study Design
+This is a prospective implementation study evaluating a structured digital strategy for home blood pressure monitoring in hypertensive patients followed at the Specialized Hypertension Unit of the Fundación Favaloro University Hospital. The study will be conducted within the context of routine clinical practice and will include an intra-subject before-and-after comparison between baseline values and those obtained after six months of follow-up.
+Study Population
+Inclusion Criteria
+* Age ≥18 years. 
+* Diagnosis of arterial hypertension. 
+* Availability of a baseline 24-hour ambulatory blood pressure monitoring (ABPM) performed within 30 days prior to study inclusion, with the possibility of repeating ABPM at 6 months.
+* Physical and technical ability to perform home blood pressure monitoring using a validated automatic upper-arm device with an appropriately sized cuff. 
+Exclusion Criteria
+* Age <18 years. 
+* Pregnancy. 
+* Diagnosis of atrial fibrillation. 
+* Physical, psychological, or technical limitations preventing adequate home blood pressure monitoring. 
+Study Procedures
+At study entry, baseline clinical data and baseline ABPM recordings will be documented.
+Subsequently, a structured digital strategy for home blood pressure monitoring will be implemented through a simple and user-friendly platform including graphical visualization of blood pressure recordings, monitoring reminders, and automated feedback informing patients whether blood pressure values are controlled or uncontrolled once the monitoring period has been completed.
+Participants will perform HBPM during seven consecutive days at four time points throughout the study: baseline, week 8, week 16, and week 24.
+Measurements will be obtained twice in the morning and twice in the evening and manually uploaded into the digital platform using a dedicated access link.
+During on-site follow-up visits, office blood pressure values, therapeutic modifications according to routine clinical practice, and clinical events reported by patients will be recorded.
+At the end of follow-up (6 months), a repeat ABPM study will be performed.
+Study Variables
+Primary Variables
+* Change in 24-hour, daytime, systolic, diastolic, and mean blood pressure measured by ABPM between baseline and 6 months. 
+Secondary Variables
+* Evolution of systolic and diastolic blood pressure measured by HBPM. 
+* Percentage of patients with controlled blood pressure at baseline and after 6 months. 
+* Adherence to protocolized HBPM. 
+* Percentage of therapeutic modifications performed during follow-up. 
+* Reported clinical events. 
+Operational Definitions
+Blood pressure control will be defined according to the 2026 Latin American Consensus on Hypertension and Metabolic Disturbances and the 2024 ESC Guidelines:
+* 24-hour ABPM: mean blood pressure <130/80 mmHg. 
+* Daytime ABPM: mean blood pressure <135/85 mmHg. 
+* HBPM: mean blood pressure <135/85 mmHg.
+Estimated Sample Size
+Sample size calculation was based on the primary endpoint, defined as the change in systolic blood pressure measured by 24-hour ambulatory blood pressure monitoring (ABPM) between baseline and 6 months in an intra-subject comparative design. The sample size calculation was based on systolic blood pressure reduction, considered the primary efficacy variable for statistical powering purposes.
+Assuming a minimum clinically relevant reduction of 3.7 mmHg in systolic blood pressure, a standard deviation of change of 15 mmHg, a two-sided significance level of 0.05, and a statistical power of 80%, a total of 129 evaluable patients was estimated to be necessary.
+Considering a potential follow-up loss rate of 10–15%, the anticipated recruitment target will be approximately 145–155 patients. Operationally, a total sample size of 150 patients is planned.
+Statistical Analysis
+Continuous variables will be expressed as mean ± standard deviation or median and interquartile range, according to data distribution. Categorical variables will be presented as frequencies and percentages.
+Changes in blood pressure values between baseline and 6 months will be assessed using paired statistical tests (paired Student’s t-test or Wilcoxon signed-rank test, as appropriate).
+A two-sided p value <0.05 will be considered statistically significant.
+Ethical and Medico-Legal Considerations
+The present study will be conducted in accordance with the ethical principles established in the Declaration of Helsinki and Good Clinical Practice guidelines.
+All participants will be informed about the study objectives, procedures, and the observational nature of the investigation, in accordance with Argentine Patient Rights Law No. 26,529. Participation will be voluntary, and patients may withdraw from the study at any time without affecting their routine medical care.
+The study protocol will be submitted for evaluation and approval by the Research Ethics Committee of the Fundación Favaloro University Hospital prior to study initiation.
+All information obtained during the study will remain protected under professional confidentiality regulations in accordance with Argentine Law No. 17,132.
+Informed Consent
+Prior to inclusion, all participants will receive verbal and written information regarding the study objectives, procedures, benefits, and potential risks associated with participation.
+Adequate time will be provided to ensure participants fully understand the information and have the opportunity to ask questions before signing the informed consent form.
+Personal Data Protection
+Clinical data collected during the study will be treated with strict confidentiality and used exclusively for research purposes.
+All collected information will be anonymized through the assignment of unique identification codes, preventing direct patient identification.
+Personal data processing will be performed in accordance with the Argentine National Personal Data Protection Law No. 25,326.
+6. Study Limitations
+One of the main limitations of the present study is its intra-subject comparative design without a parallel control group, which may limit the ability to establish a definitive causal relationship between the observed effects and the implemented digital strategy.
+In addition, since the study will be conducted in a specialized hypertension unit, results may not be directly generalizable to other healthcare settings with different patient profiles or lower levels of clinical complexity.
+Another potential limitation is the possibility of a ceiling effect, given that baseline blood pressure control rates in specialized hypertension centers may already be relatively high, thereby reducing the margin for detectable improvement in some patients.
+Finally, because the strategy is integrated into routine clinical practice, the influence of therapeutic changes introduced during follow-up on the observed outcomes cannot be completely excluded.
+7. References
+1. Prospective Studies Collaboration. Age-specific relevance of usual blood pressure to vascular mortality: a meta-analysis of individual data for one million adults in 61 prospective studies. Lancet. 2002;360:1903–1913. 
+2. Cappuccio FP, Kerry SM, Forbes L, Donald A. Blood pressure control by home monitoring: meta-analysis of randomized trials. BMJ. 2004;329:145. 
+3. Parati G, Stergiou GS, Asmar R, et al. European Society of Hypertension practice guidelines for home blood pressure monitoring. J Hum Hypertens. 2010;24(12):779–785. 
+4. Parati G, Omboni S. Role of home blood pressure telemonitoring in hypertension management: an update. Blood Press Monit. 2010;15(6):285–295. 
+5. Parati G, Stergiou GS, Dolan E, Bilo G. Blood pressure variability: clinical relevance and application. Role of home blood pressure teletransmission. Hypertens Res. 2010;33:1021–1028. 
+6. Proia KK, Thota AB, Njie GJ, et al. Team-based care and improved blood pressure control: a systematic review. Am J Prev Med. 2014;47:86–99. 
+7. Marin MJ, Fábregues G, Rodríguez PD, et al. National Registry of Hypertension in Argentina (RENATA): prevalence, awareness, treatment, and control of arterial hypertension in Argentina. J Hypertens. 2016;34(11):2035–2042. 
+8. Tucker KL, Sheppard JP, Stevens R, et al. Self-monitoring of blood pressure in hypertension: a systematic review and individual patient data meta-analysis. Lancet. 2017;391:949–959. 
+9. Parati G, Omboni S, Albini F, et al. Home blood pressure telemonitoring in the 21st century. J Clin Hypertens (Greenwich). 2018;20(7):1128–1132. 
+10. Umemura S, Arima H, Arima S, et al. The Japanese Society of Hypertension Guidelines for the Management of Hypertension. Hypertens Res. 2019;42:1235–1481. 
+11. Omboni S, McManus RJ, Bosworth HB, et al. Evidence and recommendations on the use of telemedicine for the management of arterial hypertension. Hypertension. 2020;76:1368–1383. 
+12. Shimbo D, Artinian NT, Basile JN, et al. Self-measured blood pressure monitoring at home: a joint policy statement from the American Heart Association and American Medical Association. Hypertension. 2020;76:e42–e67. 
+13. GBD 2019 Risk Factors Collaborators. Global burden of 87 risk factors in 204 countries and territories, 1990–2019. Lancet. 2020;396:1223–1249. 
+14. Williams B, Mancia G, Spiering W, et al. 2023 ESH Guidelines for the management of arterial hypertension. J Hypertens. 2023;41:1874–2071. 
+15. Arima H, et al. The Japanese Society of Hypertension Guidelines for Blood Pressure Control Using Digital Technologies. Hypertens Res. 2026. 
+16. Coca A, Sanchez R, Molina de Salazar DI, et al. 2026 Latin American Consensus for the Management of Patients with Hypertension and Cardio-Renal and Metabolic Disturbances: endorsed by the Latin American Society of Hypertension, the Iberoamerican Hypertension League, and the World Hypertension League. J Hypertens. 2026;44(6).

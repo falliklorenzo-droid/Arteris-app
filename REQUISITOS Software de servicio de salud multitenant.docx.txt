@@ -1,0 +1,53 @@
+﻿Software de servicio de salud multitenant. Una plataforma online a la que las instituciones acceden mediante usuario y contraseña, pagando una suscripción mensual por paciente activo.
+
+
+Exportación PDF 
+Contenido del PDF:
+* Datos del paciente
+* Últimos 7 días de HBPM (son dos registros de presión arterial de la mañana y dos registros de la noche)
+* Tendencia gráfica
+* Tratamiento médico que recibe fármaco y dosis
+* Eventos adversos
+* Alertas generadas
+Formato profesional (apta historia clínica digital).
+Debe cumplir:
+* Ley 25.326 (protección de datos personales)
+* Datos sensibles (salud)
+* Servidores seguros
+* Política de privacidad robusta
+
+
+
+
+Desarrollo tecnológico MVP sólido
+Equipo mínimo:
+* 1 backend
+* 1 frontend mobile
+* 1 diseñador UX
+* 1 QA parcial
+* 1 PM
+
+
+ Infraestructura (anual)
+* Servidores cloud
+* Seguridad
+* Backup
+* Certificados
+* Monitoreo
+
+
+Software factory mediana con experiencia en:
+* SaaS B2B
+* Paneles administrativos
+* Seguridad de datos
+* Plataformas clínicas
+Contrato debe incluir:
+* Propiedad intelectual 
+* Acceso al repositorio código (GitHub)
+* Cláusula confidencialidad
+* Documentación técnica obligatoria
+
+
+
+
+El objetivo es que sea escalable y poder llegar a un numero de por lo menos 100.000 pacientes activos por mes.

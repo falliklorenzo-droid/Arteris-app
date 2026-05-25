@@ -3,3 +3,6 @@ supabase
 resend
 pandas
 altair
+bcrypt
+fpdf2
+matplotlib

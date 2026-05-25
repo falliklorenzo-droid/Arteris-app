@@ -1,0 +1,35 @@
+name: Recordatorios HBPM
+
+# Envía los recordatorios de carga de presión arterial dos veces por día.
+# Los horarios están en UTC. Argentina = UTC-3.
+#   13:00 UTC  ->  10:00 hs (Argentina)
+#   21:00 UTC  ->  18:00 hs (Argentina)
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+    - cron: '0 21 * * *'
+  workflow_dispatch:   # permite ejecutarlo manualmente desde la pestaña Actions
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install supabase resend
+
+      - name: Enviar recordatorios
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+        run: python enviar_recordatorios.py

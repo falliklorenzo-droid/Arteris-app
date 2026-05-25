@@ -1,0 +1,102 @@
+﻿Evaluación de una estrategia digital para el monitoreo domiciliario de presión arterial estructurado en un servicio especializado de hipertensión arterial: estudio prospectivo con comparación intra-sujeto.
+
+
+1. Introducción y antecedentes.
+La hipertensión constituye uno de los principales factores de riesgo cardiovascular modificables a nivel global. Se estima que más de mil millones de personas en el mundo la padecen siendo responsable de aproximadamente el 50 % de las muertes por enfermedad coronaria y accidente cerebrovascular. 
+A pesar de la disponibilidad de tratamientos eficaces, su control continúa siendo subóptimo en la mayoría de los sistemas de salud en el mundo. En diversos registros poblacionales se ha observado que menos de la mitad de los pacientes hipertensos tratados alcanzan los objetivos terapéuticos recomendados.
+En Argentina, estudios epidemiológicos como el registro RENATA han demostrado que, aunque una proporción significativa de los pacientes hipertensos recibe tratamiento farmacológico, las tasas de control tensional siguen siendo insuficientes. El reciente Documento del Consenso Latinoamericano para el manejo de pacientes con hipertensión y disturbios cardio renales y metabólicos 2026 menciona la alta prevalencia de hipertensión en países de LATAM con bajas tasas de diagnóstico, tratamiento y control, con una prevalencia que excede el 40% para ambos sexos en la Argentina. Entre las mujeres con hipertensión el 72% fueron diagnosticadas, el 64% tratadas y el 35% controladas, mientras que en los varones solo el 57% de los casos con tal condición fueron diagnosticados, el 47% tratados y tan solo el 23% controlados. 
+Entre los factores detectados que contribuyen a esta brecha se encuentran la falta de concientización en la población, la falta de políticas públicas sanitarias de prevención, la baja adherencia al tratamiento, insuficientes condiciones socioeconómicas que dificultan el acceso al sistema de salud, a una dieta saludable y medicación de modo ininterrumpido,  inercia terapéutica y una limitada disponibilidad de herramientas sistemáticas y accesibles para el seguimiento longitudinal de los pacientes fuera del consultorio, entre otros.
+En este escenario, el monitoreo domiciliario de presión arterial (Home Blood Pressure Monitoring, HBPM) ha sido incorporado en las últimas décadas como una herramienta fundamental para la evaluación y seguimiento de los pacientes hipertensos fuera del consultorio. Fue establecido que tiene un mayor poder predictivo de enfermedades cardiovasculares y mortalidad que la medición en el consultorio.
+Diversos ensayos clínicos y metaanálisis han demostrado que el HBPM puede contribuir a mejorar el control tensional, particularmente cuando se integra a estrategias estructuradas de seguimiento y retroalimentación clínica. 
+En consecuencia, múltiples guías internacionales de hipertensión actualmente recomiendan el uso sistemático del monitoreo domiciliario para el diagnóstico, la titulación terapéutica y el seguimiento de los pacientes hipertensos. Entre ellas el reciente documento del Consenso de la Sociedad Latinoamericana de Hipertensión y disturbios cardio renales y metabólicos 2026, la Liga Iberoamericana de hipertensión, la Sociedad Europea de Hipertensión (ESH), la Liga Mundial de Hipertensión, Asociación Americana de Cardiología (AHA) y Guías Japonesas de Hipertensión, entre otras.
+Si bien el Monitoreo Ambulatorio de la Presión Arterial (MAPA) continúa siendo el estándar de oro para el diagnóstico de la hipertensión enmascarada, el MDPA es una herramienta capaz de identificar a pacientes con hipertensión de bata blanca y a la hipertensión enmascarada.
+En los últimos años y en la actualidad, gracias al desarrollo de nuevas herramientas digitales se abren nuevas oportunidades para estructurar y optimizarlo. Plataformas digitales capaces de registrar, organizar y visualizar las mediciones domiciliarias se presentan para facilitar el procedimiento, mejorar la adherencia al tratamiento y promover intervenciones oportunas. 
+En dicho sentido, la mayor parte de la evidencia disponible proviene de estrategias complejas que combinan múltiples intervenciones como el telemonitoreo, educación del paciente, teleconsulta, programas de atención multidisciplinarios, sin contar con un análisis del impacto específico del HBPM en la presión arterial con la implementación sistemática y estructurada a través de una herramienta digital en comparación al estándar de oro, el MAPA.
+A pesar de la creciente evidencia que respalda el uso del monitoreo domiciliario de presión arterial y el desarrollo de herramientas digitales, aún no se ha empleado con todo su potencial con limitada información hasta el momento en la práctica asistencial. En particular, no se dispone de datos locales que evalúen su implementación ni su impacto sobre parámetros objetivos de control tensional, como el monitoreo ambulatorio de presión arterial (MAPA). 
+Diversos estudios han demostrado que la integración del monitoreo domiciliario con sistemas de transmisión y visualización remota de datos permite mejorar el control tensional, facilitando la toma de decisiones clínicas más oportunas con reducción de la inercia terapéutica y mejor control. En particular, Parati y colaboradores han destacado que el telemonitoreo domiciliario no solo mejora la adherencia al seguimiento, sino que también permite una caracterización más precisa del perfil tensional del paciente en condiciones de vida real, constituyendo una herramienta clave en el manejo moderno de la hipertensión arterial. Asimismo, se ha señalado que su implementación puede realizarse con modelos organizacionales escalables y potencialmente costo-efectivos dentro de los sistemas de salud de allí la relevancia de evaluar en el presente estudio el impacto del HBPM estructurado con el empleo de una herramienta digital amigable, simple con teletransmisión de los datos y alertas orientativas automáticas para que el paciente conozca si su presión arterial se encuentra o no controlada, con posible respuesta medica asincrónica cuando la solicita.
+2. Objetivo primario
+Evaluar el cambio en la presión arterial sistólica y diastólica medida por monitoreo ambulatorio de presión arterial (MAPA) de 24 horas entre el registro basal y a los 6 meses tras la implementación de una estrategia digital estructurada para el monitoreo domiciliario de presión arterial estandarizado de 7 días sucesivos en pacientes hipertensos atendidos en un servicio especializado de hipertensión arterial.
+3. Objetivos secundarios
+1. Evaluar la evolución de la presión arterial sistólica y diastólica medida por monitoreo domiciliario de presión arterial (HBPM) durante el seguimiento.
+2. Determinar el porcentaje de pacientes con presión arterial controlada según criterios de MAPA y HBPM al inicio y 6 meses.
+3. Evaluar la adherencia al monitoreo domiciliario protocolizado durante el período de seguimiento.
+4. Analizar los cambios terapéuticos realizados durante el seguimiento como medida indirecta de inercia terapéutica.
+5. Registrar eventos clínicos reportados durante el seguimiento.
+4. Hipótesis
+La implementación de una estrategia digital estructurada para el monitoreo domiciliario de presión arterial con alertas automáticas facilita y permite optimizar el control tensional en pacientes hipertensos, expresado en una reducción significativa de la presión arterial sistólica y diastólica medida y verificada por monitoreo ambulatorio de presión arterial (MAPA) de 24 horas a los 6 meses.
+5.Materiales y métodos
+Diseño del estudio
+Estudio prospectivo de implementación de una estrategia digital estructurada para el monitoreo domiciliario de presión arterial en pacientes hipertensos atendidos en el Servicio especializado de Hipertensión Arterial del Hospital Universitario de la Fundación Favaloro. El estudio se desarrollará en el contexto de la práctica clínica habitual y contemplará una comparación intra-sujeto (antes–después) entre los valores basales y los obtenidos a los seis meses de seguimiento.
+Población de estudio
+Criterios de inclusión
+* Edad ≥18 años.
+* Diagnóstico de hipertensión arterial.
+* Disponibilidad de monitoreo ambulatorio de presión arterial (MAPA) basal realizado dentro de los 12 meses previos a la inclusión en el estudio y con posibilidad de repetirlo a los 6 meses.
+* Capacidad física y material para realizar monitoreo domiciliario de presión arterial con un dispositivo validado automático con brazalete standard (12 a 13 cm. ancho y 35 cm. de largo.), mango ancho si el perímetro del brazo es mayor a 32 cm. y mango pequeño si es menor a 22 cm.
+Criterios de exclusión
+* Edad menor de 18 años
+* Embarazo
+* Diagnóstico de fibrilación auricular 
+* Limitación psicofísica y/o material para realizar monitoreo domiciliario de presión arterial.
+Procedimientos del estudio
+Al inicio del estudio se registrarán los datos clínicos basales y se documentará el monitoreo ambulatorio de presión arterial (MAPA) basal. 
+Posteriormente se implementará una estrategia digital estructurada para el monitoreo domiciliario de presión arterial de modo simple y amigable con gráficos de los registros de presión arterial, alertas para el cumplimiento de este y con un resultado automático que le informa al paciente una vez completado si la presión arterial se encuentra controlada o no controlada.
+Los participantes realizarán el monitoreo domiciliario durante siete días en cuatro momentos del estudio: basal, semana 8, semana 16 y semana 24.
+Los registros serán tomados dos veces por la mañana y dos veces por la tarde y serán cargados a un software en forma manual de forma sistematizada luego de recibir el link de ingreso.
+Durante el seguimiento en forma presencial se registrarán los valores de presión arterial, los cambios terapéuticos realizados según criterio clínico habitual, así como los eventos clínicos reportados por los pacientes.
+Al finalizar del seguimiento (6 meses) se realizará un nuevo monitoreo ambulatorio de presión arterial (MAPA) de control.
+Variables del estudio
+Variables primarias
+* Cambio en presión arterial sistólica, diastólica y media medida por MAPA de 24 horas y diurna entre los valores basales y a los 6 meses.
+Variables secundarias
+* Evolución de la presión arterial sistólica y diastólica medida por monitoreo domiciliario de presión arterial (HBPM).
+* Porcentaje de pacientes con presión arterial controlada al inicio y 6 meses.
+* Adherencia al monitoreo domiciliario protocolizado
+* Porcentaje de cambios terapéuticos realizados durante el seguimiento
+* Eventos clínicos reportados
+Definiciones operativas
+Se considerará presión arterial controlada según los criterios del Consenso Latinoamericano de Hipertensión y disturbios metabólicos 2026, Guias ESC 2024.
+* MAPA 24 horas: presión arterial promedio <130/80 mmHg
+* MAPA diurno: presión arterial promedio <135/85 mmHg
+* Monitoreo domiciliario de presión arterial (HBPM): presión arterial promedio <135/85 mmHg
+Tamaño de la muestra estimado
+El tamaño muestral fue calculado para el objetivo primario, definido como el cambio en la presión arterial sistólica medida por monitoreo ambulatorio de presión arterial (MAPA) de 24 horas entre el basal y los 6 meses, en un diseño con comparación intra-sujeto.
+Asumiendo una diferencia mínima clínicamente relevante de 3,7 mmHg en presión arterial sistólica, una desviación estándar del cambio de 15 mmHg, un nivel de significación bilateral de 0,05 y una potencia estadística del 80%, se estimó un tamaño muestral de 129 pacientes evaluables. Considerando una pérdida potencial durante el seguimiento del 10–15%, se prevé reclutar aproximadamente 145 a 155 pacientes. En términos operativos, se propone un reclutamiento total de 150 pacientes.
+Análisis estadístico
+Las variables continuas se expresarán como media ± desvío estándar o mediana y rango intercuartílico según su distribución. Las variables categóricas se presentarán como frecuencias y porcentajes.
+Para evaluar los cambios en presión arterial entre el basal y los seis meses se utilizarán pruebas estadísticas para muestras pareadas (t de Student para muestras relacionadas o prueba de Wilcoxon según corresponda).
+Se considerará un valor de p < 0,05 como estadísticamente significativo.
+Consideraciones éticas y médico legales
+El presente estudio se llevará a cabo de acuerdo con los principios éticos establecidos en la Declaración de Helsinki y las normas de buena práctica clínica.
+Todos los participantes serán informados acerca de los objetivos del estudio, los procedimientos a realizar y la naturaleza observacional de la investigación de conformidad con la Ley de los Derechos del Paciente, 26.529. La participación será voluntaria y los pacientes podrán retirarse del estudio en cualquier momento sin que ello afecte su atención médica habitual.
+El protocolo será sometido a evaluación y aprobación por el Comité de Ética en Investigación del Hospital Universitario de la Fundación Favaloro previo a su inicio.
+La información se encontrará amparada bajo los considerandos del Secreto Profesional Ley 17.132.
+Consentimiento informado
+Antes de su inclusión en el estudio, todos los participantes recibirán información verbal y escrita acerca de los objetivos, procedimientos, beneficios y posibles riesgos asociados a su participación.
+Se garantizará que los participantes comprendan adecuadamente la información brindada y dispongan del tiempo necesario para realizar preguntas antes de firmar el consentimiento informado.
+Protección de datos personales
+Los datos clínicos obtenidos durante el estudio serán tratados con estricta confidencialidad y utilizados exclusivamente con fines de investigación.
+La información recolectada será registrada de forma anonimizada, asignando a cada participante un código identificador que impedirá su identificación directa.
+El tratamiento de los datos personales se realizará conforme a lo establecido en la Ley Nacional de Protección de Datos Personales N°25.326.
+6. Limitaciones del estudio
+Entre las principales limitaciones del presente estudio se encuentra su diseño con comparación intra-sujeto, sin grupo control paralelo, lo que podría limitar la atribución causal absoluta del efecto observado a la estrategia digital implementada.
+Asimismo, al tratarse de un estudio realizado en un servicio especializado de hipertensión arterial, los resultados podrían no ser directamente extrapolables a otros ámbitos asistenciales con diferente perfil de pacientes o menor complejidad de atención.
+Otra limitación potencial es la presencia de un efecto techo, dado que en un servicio especializado las tasas de control basal podrían ser relativamente elevadas, reduciendo el margen de mejoría observable en algunos pacientes.
+Finalmente, al tratarse de una estrategia integrada en la práctica clínica habitual, no puede excluirse la influencia de posibles cambios terapéuticos realizados durante el seguimiento sobre los resultados observados.
+7. Bibliografía consultada
+1. Prospective Studies Collaboration. Age-specific relevance of usual blood pressure to vascular mortality: a meta-analysis of individual data for one million adults in 61 prospective studies. Lancet. 2002;360:1903-1913.
+2. Cappuccio FP, Kerry SM, Forbes L, Donald A. Blood pressure control by home monitoring: meta-analysis of randomised trials. BMJ. 2004;329:145.
+3. Parati G, Stergiou GS, Asmar R, Bilo G, de Leeuw P, Imai Y, Kario K, Lurbe E, Manolis A, Mengden T, O’Brien E, Ohkubo T, Padfield P, Palatini P, Pickering TG, Redon J, Revera M, Ruilope LM, Shennan A, Staessen JA, Tisler A, Waeber B, Zanchetti A, Mancia G, ESH Working Group on Blood Pressure Monitoring. European Society of Hypertension practice guidelines for home blood pressure monitoring. J Hum Hypertens. 2010;24(12):779–85.
+4. Gianfranco Parati, Stefano Omboni. Role of home blood pressure telemonitoring in hypertension management: an update. Blood Press. Monit.2010 Dec; 15(6):285-95. doi: 10.1097/MBP.0b013e328340c5e4.
+5. Parati G, Stergiou GS, Dolan E, Bilo G. Blood pressure variability: clinical relevance and application. Role of home blood pressure teletransmission. Hypertens Res. 2010;33:1021–1028.
+6. Proia KK, Thota AB, Njie GJ, et al. Team-based care and improved blood pressure control: a systematic review. Am J Prev Med. 2014;47:86-99.
+7. Marin MJ, Fábregues G, Rodríguez PD, et al. Registro Nacional de Hipertensión Arterial (RENATA): prevalencia, conocimiento, tratamiento y control de la hipertensión arterial en Argentina. J Hypertens. 2016;34(11):2035-2042.
+8. Tucker KL, Sheppard JP, Stevens R, et al. Self-monitoring of blood pressure in hypertension: a systematic review and individual patient data meta-analysis. Lancet. 2017;391:949-959.
+9. Parati G, Omboni S, Albini F, et al. Home blood pressure telemonitoring in the 21st century. J Clin Hypertens (Greenwich). 2018;20(7):1128–1132.
+10. Umemura S, Arima H, Arima S, et al. The Japanese Society of Hypertension Guidelines for the Management of Hypertension. Hypertens Res. 2019;42:1235-1481.
+11. Omboni S, McManus RJ, Bosworth HB, et al. Evidence and recommendations on the use of telemedicine for the management of arterial hypertension. Hypertension. 2020;76:1368-1383.
+12. Shimbo D, Artinian NT, Basile JN, et al. Self-measured blood pressure monitoring at home: a joint policy statement from the AHA and AMA. Hypertension. 2020;76:e42-e67.
+13. GBD 2019 Risk Factors Collaborators. Global burden of 87 risk factors in 204 countries and territories, 1990–2019. Lancet. 2020;396:1223-1249.
+14. Williams B, Mancia G, Spiering W, et al. 2023 ESH Guidelines for the management of arterial hypertension. J Hypertens. 2023;41:1874-2071.
+15. 15.Arima H, et al. The Japanese Society of Hypertension Guidelines for Blood Pressure Control Using Digital Technologies. Hypertension Research. 2026.
+16. Antonio Coca, Ramiro Sanchez, Dora I. Molina de Salazar, Ernesto Penaherrera, Luis Alcocer, Eduardo Barbosa, Guido Grassi, Patricio Lopez-Jaramilloh, Empar Lurbej, Jose Parra-Carrillo, Agustın J. Ramirez, Josep Redon, Weimar Sebba-Barroso, Andres Acosta, Dagnovar Aristizabal, Alfonso Bryce,  Gustavo Cerezo, Ricardo V. Cohen, Margarita E. Diaz-Velasco, Rafael Hernández, Fernando Lanas, Livia Machado,  Carla Musso y Daniel Piskorz,  Carlos I. Ponte-Negretia, Olga Ramosa, Marıa J. Sanchez , Osiris Valdez, Augusto Vicario, Raul Villar, Gianfranco Parati, Paul K. Whelton, Fernando Wyss, and Giuseppe Mancia. Consensus Document. 2026 Latin American consensus for the management of patients with hypertension and cardio-renal and metabolic disturbances: endorsed by the Latin American Society of Hypertension, the Iberoamerican Hypertension League, and the World Hypertension League. Journal of Hypertension Volume 44  Number 6  June 2026.

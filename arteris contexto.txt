@@ -1,0 +1,32 @@
+﻿PROCEDIMIENTO GENERAL.
+
+
+Somos un equipo constituido por una médica especialista en hipertensión arterial y un licenciado en negocios digitales que estamos desarrollando un software multi tenant para dar respuesta a un proyecto de telemedicina enfocado a mejorar el control de la presión arterial en la población de pacientes hipertensos en latinoamérica, inicialmente Argentina. 
+
+
+Nuestro objetivo principal es el desarrollo de la plataforma web escalable, de fácil uso, accesible a por lo menos 100.000 pacientes activos a través de instituciones.
+Estamos utilizando por sugerencia de IA las siguientes herramientas: Github (código), Streamlit, Supabase, etc. 
+
+
+Al ingreso a la plataforma, buscamos un aspecto sobrio, colores azul oscuro, letras plateadas o blancas y algún detalle en rojo.
+El título debe decir: MONITOREO DOMICILIARIO DE PRESIÓN ARTERIAL.
+Una herramienta reconocida mundialmente para un mejor control de la presión arterial.
+PASOS A SEGUIR PARA EL MONITOREO. DIBUJO. Aclarar que debe ser empleado un equipo de medición automático validado con brazalete estándar para brazo (12 a 13 cm. ancho y 35 cm. de largo.), mango ancho si el perímetro del brazo es mayor a 32 cm. y mango pequeño si es menor a 22 cm. 
+Recomendado 1. Latin American Society of Hypertension, 2. Iberoamerican Hypertension League,  3.The World Hypertension League, 4. European Society of Hypertension. 5. American Heart Association. 6. Guías Japonesas de Hipertensión. 7. The Hope Asia Network, Guías NICE, entre otras. 
+
+
+La plataforma recopila los valores de presión arterial que los pacientes cargan manualmente y será el HBPM-home blood pressure monitoring- monitoreo domiciliario de presión arterial,  un procedimiento estructurado sistematizado conocido y validado mundialmente como una herramienta fundamental para la evaluación y seguimiento de los pacientes hipertensos fuera del consultorio. Fue establecido que tiene un mayor poder predictivo de enfermedades cardiovasculares y mortalidad que la medición en el consultorio.Diversos ensayos clínicos y metaanálisis han demostrado que el HBPM puede contribuir a mejorar el control tensional, particularmente cuando se integra a estrategias estructuradas de seguimiento y retroalimentación clínica.
+El paciente en forma manual durante 7 días sucesivos realizará dos tomas de la presión arterial por la mañana y dos tomas por la tarde antes de la cena con las particularidades del procedimiento detallado al ingreso a la plataforma luego de registrar sus datos (PASOS a seguir). 
+Una vez finalizado se le da un resultado final, que corresponde al promedio de los registros de presion arterial sistolica y diastolica de la mañana, de la tarde de los ultimos 6 dias (se descarta el dia 1), el promedio general diario y el promedio general de los últimos 6 días, con un feedback si su presión arterial está controlada o no, si debiera hacer una consulta a la brevedad o con carácter urgente. 
+El flujo es el siguiente. 
+1. El administrador (en principio Lorenzo) envía el mail al médico/institución un enlace único para crear su cuenta que no caduca (solo se puede usar una vez para una cuenta). Esto está orientado al concepto multitenant escalable en una etapa posterior a múltiples instituciones médicas. 
+2- El médico/institución ingresa a la plataforma e ingresa los datos (nombre, apellido, mail) del paciente al que quiere controlar mediante HBPM-home blood pressure monitoring- monitoreo domiciliario de presión arterial y envía el enlace a dicho fin vía correo electrónico registrado. 
+3- Al paciente le llega el mail con el enlace único para crear su cuenta en la plataforma y una vez dentro completa su registro de 7 días todo amparado por la ley de proteccion de datos personales, derechos del paciente y secreto profesional.
+4.En base al resultado final el software dará una respuesta automática: En este Monitoreo Domiciliario de Presión Arterial: 1. su presión arterial está controlada según los actuales consensos, 2. su presión arterial no está controlada según los actuales consensos, 3. su presión arterial no se encuentra controlada según los actuales consensos y requiere de atención médica urgente, 4. los valores de presión arterial se encuentran por debajo de las cifras óptimas, se sugiere control médico a la brevedad posible. 
+En el caso 1, 2 y 3 se considerará cualquiera de los dos valores del promedio final para la categorización.
+1.Menos de 135/85 mmHg → Presión arterial controlada.
+2.Mayor a 135/85 mmHg → Presión arterial no controlada. Se sugiere consulta médica.
+3.Mayor a 180/110 mmHg → Usted debe consultar urgente con un médico.
+4.Menos de 90/60 mmHg. Si cualquiera de los dos valores es inferior → se sugiere consulta médica a la brevedad.
+5. Una vez completado el HBPM con formato PDF el paciente toma la conducta según indicación médica y/o recomendación automática.
+Adjunto modelo posible

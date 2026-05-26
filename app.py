@@ -636,7 +636,7 @@ def grafico_evolucion(mediciones):
         color=alt.Color("tipo:N", scale=alt.Scale(domain=["sistolica", "diastolica"], range=["#3b82f6", "#06b6d4"]),
                         legend=alt.Legend(labelColor="#94a3b8")),
         tooltip=["etiqueta:N", "sistolica:Q", "diastolica:Q", "momento:N"]
-    ).properties(height=280, background="#0a1628").configure_view(strokeColor="#1e293b")
+    ).properties(height=280, background="#0a1628").configure_view(stroke="#1e293b")
     st.altair_chart(chart, use_container_width=True)
 
 # ── Exportación PDF ───────────────────────────────────────────────────────────

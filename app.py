@@ -1100,7 +1100,7 @@ elif st.session_state.vista == "paciente_ajustes":
     with col1:
         st.markdown('<div class="art-card">', unsafe_allow_html=True)
         st.markdown("#### 📧 Recordatorios por email")
-        st.markdown('<p style="font-size:13px;color:#94a3b8;">Recibirás un recordatorio para cargar tu presión arterial a las 10 y a las 18 hs cada día.</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:13px;color:#94a3b8;">Recibirás un recordatorio para cargar tu presión arterial a las 7 hs y a las 19 hs cada día.</p>', unsafe_allow_html=True)
         recordatorios_actual = paciente.get("recordatorios_email", True)
         nuevo_valor = st.toggle("Activar recordatorios por email", value=recordatorios_actual)
         if nuevo_valor != recordatorios_actual:
@@ -1131,8 +1131,38 @@ elif st.session_state.vista == "paciente_ajustes":
                 st.success("✅ Contraseña actualizada correctamente.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="art-card" style="margin-top:1rem;">', unsafe_allow_html=True)
-    st.markdown("#### 👤 Mis datos personales")
+    st.markdown('<div class="art-card" style="margin-top:1rem;"><h4 style="margin-top:0;">💊 Mi medicación</h4>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">Si te equivocaste o tu médico cambió tu medicación, podés actualizarla acá.</p>', unsafe_allow_html=True)
+    toma_med_actual = bool(paciente.get("toma_medicacion"))
+    toma_med_edit = st.radio(
+        "¿Tomás medicación para la presión arterial?",
+        ["No", "Sí"],
+        index=1 if toma_med_actual else 0,
+        horizontal=True,
+        key="edit_toma_med",
+    )
+    med_actual = paciente.get("medicacion", "") or ""
+    dosis_actual = paciente.get("dosis", "") or ""
+    medicacion_edit = ""
+    dosis_edit = ""
+    if toma_med_edit == "Sí":
+        medicacion_edit = st.text_input("¿Qué medicación tomás?", value=med_actual, placeholder="Ej: Enalapril", key="edit_medicacion")
+        dosis_edit = st.text_input("¿Cuál es la dosis?", value=dosis_actual, placeholder="Ej: 10mg cada 12hs", key="edit_dosis")
+    if st.button("Guardar cambios de medicación", use_container_width=True, key="btn_guardar_med"):
+        if toma_med_edit == "Sí" and (not medicacion_edit.strip() or not dosis_edit.strip()):
+            st.error("Completá la medicación y la dosis, o seleccioná \"No\".")
+        else:
+            actualizar_paciente(paciente["codigo"], {
+                "toma_medicacion": toma_med_edit == "Sí",
+                "medicacion": medicacion_edit if toma_med_edit == "Sí" else "",
+                "dosis": dosis_edit if toma_med_edit == "Sí" else "",
+            })
+            st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
+            st.success("✅ Medicación actualizada correctamente.")
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="art-card" style="margin-top:1rem;"><h4 style="margin-top:0;">👤 Mis datos personales</h4>', unsafe_allow_html=True)
     col_d1, col_d2, col_d3 = st.columns(3)
     with col_d1:
         st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:24px;">{paciente.get("edad","—")}</div><div class="art-metric-label">Edad</div></div>', unsafe_allow_html=True)
@@ -1188,31 +1218,13 @@ elif st.session_state.vista == "paciente_login":
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
             elif paciente and paciente.get("password_set"):
-                # Cuenta ya activada → debe ingresar con email y contraseña (sin auto-login)
-                st.info("Tu cuenta ya está activada. Ingresá con tu email y contraseña.")
-                st.markdown('<div class="art-card">', unsafe_allow_html=True)
-                st.markdown("### Ingresar a Arteris")
-                with st.form("form_login_codigo"):
-                    email_input = st.text_input("Email", value=paciente.get("email", ""))
-                    pwd_input = st.text_input("Contraseña", type="password")
-                    login_ok = st.form_submit_button("Ingresar →", use_container_width=True)
-                if login_ok:
-                    p = buscar_paciente_por_email(email_input.strip().lower())
-                    if p and p.get("password_set"):
-                        ok_pwd, nuevo_hash = verificar_password(pwd_input, p.get("password_hash", ""))
-                        if ok_pwd:
-                            if nuevo_hash:
-                                actualizar_paciente(p["codigo"], {"password_hash": nuevo_hash})
-                            st.session_state.paciente_data = p
-                            st.session_state.codigo_paciente = p["codigo"]
-                            st.session_state.rol = "paciente"
-                            st.session_state.vista = "paciente_home"
-                            st.rerun()
-                        else:
-                            st.error("❌ Contraseña incorrecta.")
-                    else:
-                        st.error("❌ Email no encontrado o cuenta no activada.")
-                st.markdown('</div>', unsafe_allow_html=True)
+                # Cuenta ya activada → limpiar codigo y caer al login normal con tabs (incluye "Olvidé mi contraseña")
+                st.session_state.codigo_paciente = ""
+                try:
+                    st.query_params.clear()
+                except Exception:
+                    pass
+                st.rerun()
             else:
                 st.error("❌ El enlace no es válido. Pedile a tu médico que te reenvíe el acceso.")
         else:
@@ -1285,8 +1297,7 @@ elif st.session_state.vista == "paciente_home":
     if not paciente.get("consentimiento_aceptado") and not st.session_state.consentimiento_ok:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.markdown('<div class="art-card">', unsafe_allow_html=True)
-            st.markdown("### 📄 Consentimiento y términos de uso")
+            st.markdown('<div class="art-card"><h3 style="margin-top:0;">📄 Consentimiento y términos de uso</h3>', unsafe_allow_html=True)
             st.markdown("""
 <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:10px;padding:1.25rem;font-size:13px;color:#94a3b8;line-height:1.7;max-height:300px;overflow-y:auto;">
 <strong style="color:#e8eef7;font-size:14px;">Consentimiento informado</strong><br><br>
@@ -1322,31 +1333,32 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
     elif not paciente.get("edad"):
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.markdown('<div class="art-card">', unsafe_allow_html=True)
-            st.markdown("### 📋 Completá tus datos")
-            with st.form("form_registro"):
-                edad = st.number_input("Edad", min_value=1, max_value=120, step=1)
-                sexo = st.selectbox("Sexo biológico", ["Femenino", "Masculino", "Otro"])
-                toma_med = st.radio("¿Tomás medicación para la presión arterial?", ["No", "Sí"], horizontal=True)
-                medicacion = ""
-                dosis = ""
-                if toma_med == "Sí":
-                    medicacion = st.text_input("¿Qué medicación tomás?", placeholder="Ej: Enalapril")
-                    dosis = st.text_input("¿Cuál es la dosis?", placeholder="Ej: 10mg cada 12hs")
-                recordatorios = st.checkbox("✉️ Quiero recibir recordatorios por email para cargar mi presión arterial", value=True)
-                st.markdown('<div style="font-size:11px;color:#64748b;margin-top:-8px;">Recibirás un recordatorio a las 10 y a las 18 hs cada día durante los 7 días del seguimiento.</div>', unsafe_allow_html=True)
-                enviado = st.form_submit_button("Guardar y comenzar →", use_container_width=True)
+            st.markdown('<div class="art-card"><h3 style="margin-top:0;">📋 Completá tus datos</h3>', unsafe_allow_html=True)
+            edad = st.number_input("Edad", min_value=1, max_value=120, step=1)
+            sexo = st.selectbox("Sexo biológico", ["Femenino", "Masculino", "Otro"])
+            toma_med = st.radio("¿Tomás medicación para la presión arterial?", ["No", "Sí"], horizontal=True)
+            medicacion = ""
+            dosis = ""
+            if toma_med == "Sí":
+                medicacion = st.text_input("¿Qué medicación tomás?", placeholder="Ej: Enalapril")
+                dosis = st.text_input("¿Cuál es la dosis?", placeholder="Ej: 10mg cada 12hs")
+            recordatorios = st.checkbox("✉️ Quiero recibir recordatorios por email para cargar mi presión arterial", value=True)
+            st.markdown('<div style="font-size:11px;color:#64748b;margin-top:-8px;">Recibirás un recordatorio a las 7 hs y a las 19 hs cada día durante los 7 días del seguimiento.</div>', unsafe_allow_html=True)
+            enviado = st.button("Guardar y comenzar →", use_container_width=True, key="btn_registro_paciente")
             if enviado and edad:
-                actualizar_paciente(codigo, {
-                    "edad": int(edad), "sexo": sexo,
-                    "toma_medicacion": toma_med == "Sí",
-                    "medicacion": medicacion, "dosis": dosis,
-                    "recordatorios_email": recordatorios,
-                    "consentimiento_aceptado": True
-                })
-                st.session_state.paciente_data = buscar_paciente(codigo)
-                st.success("✅ ¡Registro completado!")
-                st.rerun()
+                if toma_med == "Sí" and (not medicacion.strip() or not dosis.strip()):
+                    st.error("Por favor completá la medicación y la dosis antes de continuar.")
+                else:
+                    actualizar_paciente(codigo, {
+                        "edad": int(edad), "sexo": sexo,
+                        "toma_medicacion": toma_med == "Sí",
+                        "medicacion": medicacion, "dosis": dosis,
+                        "recordatorios_email": recordatorios,
+                        "consentimiento_aceptado": True
+                    })
+                    st.session_state.paciente_data = buscar_paciente(codigo)
+                    st.success("✅ ¡Registro completado!")
+                    st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
     # Homepage principal

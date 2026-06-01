@@ -658,8 +658,9 @@ def fecha_inicio_protocolo(mediciones):
     Si no hay mediciones aún, devuelve la fecha de hoy en Argentina."""
     if not mediciones:
         return hoy_arg()
-    fechas = [pd.to_datetime(m["fecha"]).date() for m in mediciones]
-    return min(fechas)
+    fechas = [pd.to_datetime(m["fecha"], format="mixed", errors="coerce").date() for m in mediciones if m.get("fecha")]
+    fechas = [f for f in fechas if pd.notna(f)]
+    return min(fechas) if fechas else hoy_arg()
 
 def dia_protocolo_actual(mediciones):
     """Devuelve el número de día del protocolo (1 a 7) según la fecha de hoy en Argentina."""
@@ -677,7 +678,14 @@ def fecha_de_dia(mediciones, dia_num):
 def tomas_de_dia(mediciones, dia_num):
     """Devuelve la lista de tomas (registros) que corresponden al día N del protocolo."""
     fecha_dia = fecha_de_dia(mediciones, dia_num)
-    return [m for m in mediciones if pd.to_datetime(m["fecha"]).date() == fecha_dia]
+    out = []
+    for m in mediciones:
+        try:
+            if pd.to_datetime(m["fecha"], format="mixed", errors="coerce").date() == fecha_dia:
+                out.append(m)
+        except Exception:
+            pass
+    return out
 
 def dias_con_faltantes(mediciones, hasta_dia=None):
     """Devuelve los días anteriores al actual que NO tienen las 4 tomas completas."""
@@ -703,10 +711,10 @@ def puede_editar(medicion):
     if not creada:
         return False
     try:
-        creada_dt = pd.to_datetime(creada)
-        if creada_dt.tz is None:
-            creada_dt = creada_dt.tz_localize(ARG_TZ)
-        ahora = pd.to_datetime(now_arg())
+        creada_dt = pd.to_datetime(creada, format="mixed", utc=True, errors="coerce")
+        if pd.isna(creada_dt):
+            return False
+        ahora = pd.to_datetime(now_arg(), utc=True)
         return (ahora - creada_dt) < pd.Timedelta(hours=12)
     except Exception:
         return False
@@ -797,7 +805,7 @@ def calcular_resultado(mediciones):
 
 def grafico_evolucion(mediciones):
     df = pd.DataFrame(mediciones)
-    df["fecha_dt"] = pd.to_datetime(df["fecha"])
+    df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
     df = df.sort_values("fecha_dt")
     df["etiqueta"] = df["fecha_dt"].dt.strftime("%d/%m") + " · " + df["momento"].fillna("")
     chart = alt.Chart(df).transform_fold(
@@ -819,7 +827,7 @@ def _grafico_png(mediciones):
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         df = pd.DataFrame(mediciones)
-        df["fecha_dt"] = pd.to_datetime(df["fecha"])
+        df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
         df = df.sort_values("fecha_dt")
         fig, ax = plt.subplots(figsize=(7, 2.8))
         x = list(range(len(df)))
@@ -902,7 +910,7 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
     pdf.set_font("Helvetica", "", 8)
     if mediciones:
         df = pd.DataFrame(mediciones)
-        df["fecha_dt"] = pd.to_datetime(df["fecha"])
+        df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
         df["dia"] = df["fecha_dt"].dt.date
         for i, dia in enumerate(sorted(df["dia"].unique()), start=1):
             sub = df[df["dia"] == dia]
@@ -1731,10 +1739,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                                 st.rerun()
                         # Form inline justo debajo si esta toma es la seleccionada
                         if st.session_state.get("atrasada_activa") == atr_key:
-                            st.markdown(
-                                '<div style="border-left:3px solid #f59e0b;padding:0.75rem 1rem;margin:0.5rem 0 1rem 0;background:rgba(245,158,11,0.06);border-radius:8px;">',
-                                unsafe_allow_html=True,
-                            )
                             with st.form(f"form_atr_{atr_key}"):
                                 cf1, cf2, cf3 = st.columns(3)
                                 with cf1:
@@ -1766,7 +1770,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                                 st.session_state.pop("atrasada_activa", None)
                                 st.session_state.pop("atrasada_data", None)
                                 st.rerun()
-                            st.markdown("</div>", unsafe_allow_html=True)
                     st.markdown("---")
 
         if total >= 28:

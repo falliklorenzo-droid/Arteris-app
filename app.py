@@ -5,11 +5,46 @@ import resend
 import uuid
 import os
 import io
+import json
 import secrets as _secrets
 import hashlib
 import bcrypt
 import pandas as pd
 import altair as alt
+
+# ── Helpers de medicación múltiple ────────────────────────────────────────────
+def parse_medicaciones(paciente):
+    """Devuelve la lista de {nombre, dosis} desde el paciente. Soporta el formato
+    nuevo (JSON list en 'medicacion') y el viejo (medicacion + dosis como strings)."""
+    raw = (paciente.get("medicacion") or "").strip()
+    if raw.startswith("[") and raw.endswith("]"):
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                out = []
+                for it in data:
+                    if isinstance(it, dict) and it.get("nombre", "").strip():
+                        out.append({"nombre": it.get("nombre", "").strip(), "dosis": it.get("dosis", "").strip()})
+                return out
+        except Exception:
+            pass
+    # Formato viejo: una sola medicación
+    if raw:
+        return [{"nombre": raw, "dosis": (paciente.get("dosis") or "").strip()}]
+    return []
+
+def serializar_medicaciones(lista):
+    """Convierte una lista de dicts a JSON string para guardar en Supabase."""
+    cleaned = [{"nombre": (m.get("nombre") or "").strip(), "dosis": (m.get("dosis") or "").strip()}
+               for m in lista if (m.get("nombre") or "").strip()]
+    return json.dumps(cleaned, ensure_ascii=False) if cleaned else ""
+
+def medicaciones_texto(paciente):
+    """Devuelve un texto plano de las medicaciones para mostrar."""
+    lista = parse_medicaciones(paciente)
+    if not lista:
+        return "Ninguna"
+    return "; ".join(f"{m['nombre']}" + (f" ({m['dosis']})" if m['dosis'] else "") for m in lista)
 
 # Zona horaria fija Argentina (UTC-3). Toda la lógica de "día actual" usa esta zona.
 ARG_TZ = timezone(timedelta(hours=-3))
@@ -347,7 +382,7 @@ def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_d
     # Alerta automática por taquicardia
     if pulso is not None and pulso >= 110:
         generar_alerta(codigo, "pulso_elevado",
-                       f"Frecuencia cardíaca elevada: {pulso} lpm ({momento}).")
+                       f"Frecuencia cardíaca elevada: {pulso} bpm ({momento}).")
     # Alerta automática al completar el monitoreo
     try:
         meds = obtener_mediciones(codigo)
@@ -819,6 +854,88 @@ def grafico_evolucion(mediciones):
     ).properties(height=280, background="#0a1628").configure_view(stroke="#1e293b")
     st.altair_chart(chart, use_container_width=True)
 
+
+def generar_conclusion(resultado, mediciones):
+    """Genera una mini-conclusión clínica orientativa basada en presión y pulso.
+    NO es diagnóstico: es un resumen orientativo para que médico y paciente lo vean rápido."""
+    if not resultado:
+        return "Sin datos suficientes para una conclusión."
+    s = resultado.get("sis_general")
+    d = resultado.get("dia_general")
+    p = resultado.get("pulso_general")
+    categoria = resultado.get("categoria", "")
+    partes = []
+    # Resumen de PA
+    if categoria == "urgente":
+        partes.append(f"<strong>Presión arterial muy elevada</strong> (promedio {s}/{d} mmHg). Se sugiere atención médica urgente.")
+    elif categoria == "baja":
+        partes.append(f"<strong>Presión arterial baja</strong> (promedio {s}/{d} mmHg). Se recomienda control.")
+    elif categoria == "controlada":
+        partes.append(f"<strong>Presión arterial controlada</strong> (promedio {s}/{d} mmHg).")
+    elif categoria == "no_controlada":
+        partes.append(f"<strong>Presión arterial no controlada</strong> (promedio {s}/{d} mmHg). Se sugiere consulta médica.")
+    # Variabilidad mañana/tarde
+    sm, dm = resultado.get("sis_manana"), resultado.get("dia_manana")
+    st_, dt_ = resultado.get("sis_tarde"), resultado.get("dia_tarde")
+    if sm and st_ and abs(sm - st_) >= 15:
+        cual = "mayor por la mañana" if sm > st_ else "mayor por la tarde"
+        partes.append(f"Variabilidad notable entre mañana y tarde ({cual}).")
+    # Pulso
+    if p is not None:
+        if p >= 100:
+            partes.append(f"Frecuencia cardíaca promedio elevada ({p} bpm): podría ser taquicardia, evaluar contexto clínico.")
+        elif p < 60:
+            partes.append(f"Frecuencia cardíaca promedio baja ({p} bpm): podría ser bradicardia, evaluar contexto clínico.")
+        else:
+            partes.append(f"Frecuencia cardíaca promedio en rango normal ({p} bpm).")
+    # Adherencia
+    try:
+        atrasadas = sum(1 for m in mediciones if m.get("cargada_atrasada"))
+        if atrasadas:
+            partes.append(f"{atrasadas} toma(s) cargada(s) con atraso (revisar adherencia del registro).")
+    except Exception:
+        pass
+    return " ".join(partes) + " <em style='color:#94a3b8;'>(Conclusión orientativa, no constituye diagnóstico médico.)</em>"
+
+
+def grafico_pulso(mediciones):
+    """Gráfico de evolución de frecuencia cardíaca con línea de promedio."""
+    df = pd.DataFrame(mediciones)
+    if "pulso" not in df.columns:
+        st.caption("Todavía no hay datos de frecuencia cardíaca para graficar.")
+        return
+    df["pulso_num"] = pd.to_numeric(df["pulso"], errors="coerce")
+    df = df.dropna(subset=["pulso_num"])
+    if df.empty:
+        st.caption("Todavía no hay datos de frecuencia cardíaca para graficar.")
+        return
+    df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
+    df = df.sort_values("fecha_dt")
+    df["etiqueta"] = df["fecha_dt"].dt.strftime("%d/%m") + " · " + df["momento"].fillna("")
+    promedio = round(float(df["pulso_num"].mean()), 1)
+    df_avg = pd.DataFrame({"promedio": [promedio]})
+
+    linea = alt.Chart(df).mark_line(point=True, color="#ef4444").encode(
+        x=alt.X("etiqueta:N", title="", sort=None,
+                axis=alt.Axis(labelAngle=-45, labelColor="#94a3b8", gridColor="#1e293b")),
+        y=alt.Y("pulso_num:Q", title="bpm",
+                axis=alt.Axis(labelColor="#94a3b8", gridColor="#1e293b"),
+                scale=alt.Scale(zero=False)),
+        tooltip=["etiqueta:N", alt.Tooltip("pulso_num:Q", title="pulso (bpm)"), "momento:N"],
+    )
+    regla_promedio = alt.Chart(df_avg).mark_rule(
+        color="#f59e0b", strokeDash=[6, 4], size=2
+    ).encode(y="promedio:Q")
+    texto_promedio = alt.Chart(df_avg).mark_text(
+        align="right", baseline="bottom", dx=-5, dy=-5,
+        color="#f59e0b", fontSize=12, fontWeight=500,
+    ).encode(y="promedio:Q", text=alt.value(f"Promedio: {promedio} bpm"))
+
+    chart = (linea + regla_promedio + texto_promedio).properties(
+        height=240, background="#0a1628"
+    ).configure_view(stroke="#1e293b")
+    st.altair_chart(chart, use_container_width=True)
+
 # ── Exportación PDF ───────────────────────────────────────────────────────────
 def _grafico_png(mediciones):
     """Devuelve un buffer PNG con la tendencia, o None si matplotlib no está disponible."""
@@ -836,6 +953,40 @@ def _grafico_png(mediciones):
         ax.axhline(135, color="#dc2626", linestyle="--", linewidth=0.7)
         ax.axhline(85, color="#dc2626", linestyle="--", linewidth=0.7)
         ax.set_ylabel("mmHg", fontsize=8)
+        ax.set_xlabel("Tomas (orden cronológico)", fontsize=8)
+        ax.tick_params(labelsize=7)
+        ax.legend(loc="upper right", fontsize=7)
+        ax.grid(alpha=0.2)
+        fig.tight_layout()
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=130)
+        plt.close(fig)
+        buf.seek(0)
+        return buf
+    except Exception:
+        return None
+
+def _grafico_pulso_png(mediciones):
+    """Gráfico PNG de pulso para el PDF. None si no hay datos o matplotlib falla."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        df = pd.DataFrame(mediciones)
+        if "pulso" not in df.columns:
+            return None
+        df["pulso_num"] = pd.to_numeric(df["pulso"], errors="coerce")
+        df = df.dropna(subset=["pulso_num"])
+        if df.empty:
+            return None
+        df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
+        df = df.sort_values("fecha_dt")
+        promedio = float(df["pulso_num"].mean())
+        fig, ax = plt.subplots(figsize=(7, 2.3))
+        x = list(range(len(df)))
+        ax.plot(x, df["pulso_num"], marker="o", markersize=3, color="#ef4444", label="Pulso (bpm)")
+        ax.axhline(promedio, color="#f59e0b", linestyle="--", linewidth=0.8, label=f"Promedio: {promedio:.1f} bpm")
+        ax.set_ylabel("bpm", fontsize=8)
         ax.set_xlabel("Tomas (orden cronológico)", fontsize=8)
         ax.tick_params(labelsize=7)
         ax.legend(loc="upper right", fontsize=7)
@@ -890,8 +1041,13 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
     pdf.cell(0, 7, t("Tratamiento médico"), ln=1)
     pdf.set_font("Helvetica", "", 10)
     if paciente.get("toma_medicacion"):
-        pdf.cell(0, 6, t(f"Fármaco: {paciente.get('medicacion','-') or '-'}"), 0, 1)
-        pdf.cell(0, 6, t(f"Dosis: {paciente.get('dosis','-') or '-'}"), 0, 1)
+        meds_lista = parse_medicaciones(paciente)
+        if meds_lista:
+            for idx, m in enumerate(meds_lista, start=1):
+                etiqueta = "Medicación" if len(meds_lista) == 1 else f"Medicación {idx}"
+                pdf.cell(0, 6, t(f"{etiqueta}: {m['nombre']}" + (f" - {m['dosis']}" if m['dosis'] else "")), 0, 1)
+        else:
+            pdf.cell(0, 6, t("Medicación: -"), 0, 1)
     else:
         pdf.cell(0, 6, t("No recibe medicación para la presión arterial."), 0, 1)
     pdf.ln(3)
@@ -924,7 +1080,7 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
                     pulso_v = r0.get("pulso") if "pulso" in fila.columns else None
                     v = f"{sis_v}/{dia_v}"
                     if pulso_v is not None and pd.notna(pulso_v):
-                        v += f" · {int(pulso_v)} lpm"
+                        v += f" · {int(pulso_v)} bpm"
                 else:
                     v = "-"
                 pdf.cell(anchos[j + 1], 7, t(v), 1, 0, "C")
@@ -940,7 +1096,7 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
         pdf.cell(0, 6, t(f"Promedio tarde: {resultado.get('sis_tarde','-')}/{resultado.get('dia_tarde','-')} mmHg"), 0, 1)
         pdf.cell(0, 6, t(f"Promedio general (días 2 a 7): {resultado.get('sis_general','-')}/{resultado.get('dia_general','-')} mmHg"), 0, 1)
         if resultado.get("pulso_general") is not None:
-            pdf.cell(0, 6, t(f"Frecuencia cardíaca promedio: {resultado.get('pulso_general')} lpm"), 0, 1)
+            pdf.cell(0, 6, t(f"Frecuencia cardíaca promedio: {resultado.get('pulso_general')} bpm"), 0, 1)
         pdf.ln(1)
         titulo_limpio = "".join(c for c in resultado.get("titulo", "") if ord(c) < 256).strip()
         pdf.set_font("Helvetica", "B", 10)
@@ -951,15 +1107,38 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
         pdf.cell(0, 6, t("Monitoreo incompleto: faltan registros para calcular el resultado."), 0, 1)
     pdf.ln(3)
 
-    # Tendencia gráfica
+    # Tendencia gráfica de presión arterial
     grafico = _grafico_png(mediciones)
     if grafico is not None:
         pdf.set_font("Helvetica", "B", 11)
-        pdf.cell(0, 7, t("Tendencia gráfica"), ln=1)
+        pdf.cell(0, 7, t("Tendencia gráfica - Presión arterial"), ln=1)
         try:
             pdf.image(grafico, w=180)
         except Exception:
             pass
+        pdf.ln(3)
+
+    # Tendencia gráfica de frecuencia cardíaca
+    grafico_p = _grafico_pulso_png(mediciones)
+    if grafico_p is not None:
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, t("Tendencia gráfica - Frecuencia cardíaca"), ln=1)
+        try:
+            pdf.image(grafico_p, w=180)
+        except Exception:
+            pass
+        pdf.ln(3)
+
+    # Conclusión orientativa
+    if resultado:
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, t("Conclusión orientativa"), ln=1)
+        pdf.set_font("Helvetica", "", 9)
+        # Sacar el HTML de la conclusión: usar versión plana
+        conclusion_plana = generar_conclusion(resultado, mediciones)
+        import re as _re
+        conclusion_plana = _re.sub(r"<[^>]+>", "", conclusion_plana).strip()
+        pdf.multi_cell(0, 5, t(conclusion_plana))
         pdf.ln(3)
 
     # Eventos adversos
@@ -1032,54 +1211,38 @@ if "reset_token" not in st.session_state:
     st.session_state.reset_token = params.get("reset", "")
 
 # ── Sesión persistente 30 días (cookie) ───────────────────────────────────────
-# Usamos extra_streamlit_components con un singleton via session_state para que el
-# componente sobreviva los reruns y los cookies se persistan correctamente.
+# Patrón recomendado por extra_streamlit_components: instanciar sin caching y usar
+# el mismo key fijo para que el componente persista entre reruns.
 try:
     import extra_streamlit_components as stx
-    _STX_OK = True
+    cookie_manager = stx.CookieManager()
 except Exception:
-    _STX_OK = False
-
-def _get_cookie_manager():
-    if not _STX_OK:
-        return None
-    if "_cookie_manager" not in st.session_state:
-        try:
-            st.session_state._cookie_manager = stx.CookieManager(key="arteris_cookies_mgr")
-        except Exception:
-            st.session_state._cookie_manager = None
-    return st.session_state._cookie_manager
-
-cookie_manager = _get_cookie_manager()
+    cookie_manager = None
 
 def set_session_cookie(token, expires):
-    mgr = _get_cookie_manager()
-    if mgr is None or not token:
+    if cookie_manager is None or not token:
         return
     try:
-        mgr.set("arteris_session", token, expires_at=expires, key=f"set_cookie_{token[:8]}")
+        cookie_manager.set("arteris_session", token, expires_at=expires)
     except Exception:
         pass
 
 def clear_session_cookie():
-    mgr = _get_cookie_manager()
-    if mgr is None:
+    if cookie_manager is None:
         return
     try:
-        mgr.delete("arteris_session", key=f"del_cookie_{_secrets.token_hex(4)}")
+        cookie_manager.delete("arteris_session")
     except Exception:
         pass
 
 def leer_session_cookie():
-    mgr = _get_cookie_manager()
-    if mgr is None:
+    if cookie_manager is None:
         return None
     try:
-        # get_all() es más confiable que get(key) en algunos casos
-        all_cookies = mgr.get_all(key="get_all_cookies")
+        all_cookies = cookie_manager.get_all()
         if all_cookies and "arteris_session" in all_cookies:
             return all_cookies["arteris_session"]
-        return mgr.get("arteris_session")
+        return cookie_manager.get("arteris_session")
     except Exception:
         return None
 
@@ -1361,15 +1524,19 @@ elif st.session_state.vista == "paciente_ajustes":
     nombre = paciente.get("nombre", "Paciente")
     navbar(f"Ajustes · {nombre}")
 
-    col_nav1, col_nav2 = st.columns([6, 1])
-    with col_nav2:
+    col_nav1, col_nav2, col_nav3 = st.columns([2, 4, 1])
+    with col_nav1:
+        if st.button("← Volver al inicio", key="btn_volver_top"):
+            st.session_state.vista = "paciente_home"
+            st.rerun()
+    with col_nav3:
         with st.popover("⚙️ " + nombre[:10]):
             st.markdown(f'<p style="font-size:13px;color:#94a3b8;margin-bottom:8px;">Sesión activa como<br><strong style="color:#e8eef7;">{nombre}</strong></p>', unsafe_allow_html=True)
             st.divider()
-            if st.button("🏠 Inicio", use_container_width=True):
+            if st.button("🏠 Inicio", use_container_width=True, key="pop_inicio"):
                 st.session_state.vista = "paciente_home"
                 st.rerun()
-            if st.button("🚪 Cerrar sesión", use_container_width=True):
+            if st.button("🚪 Cerrar sesión", use_container_width=True, key="pop_cerrar"):
                 cerrar_sesion()
 
     st.markdown("### ⚙️ Ajustes de tu cuenta")
@@ -1412,7 +1579,7 @@ elif st.session_state.vista == "paciente_ajustes":
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="art-card" style="margin-top:1rem;"><h4 style="margin-top:0;">💊 Mi medicación</h4>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">Si te equivocaste o tu médico cambió tu medicación, podés actualizarla acá.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">Podés cargar varias medicaciones (con su dosis). Usá el botón "Agregar otra" para sumar más.</p>', unsafe_allow_html=True)
     toma_med_actual = bool(paciente.get("toma_medicacion"))
     toma_med_edit = st.radio(
         "¿Tomás medicación para la presión arterial?",
@@ -1421,24 +1588,66 @@ elif st.session_state.vista == "paciente_ajustes":
         horizontal=True,
         key="edit_toma_med",
     )
-    med_actual = paciente.get("medicacion", "") or ""
-    dosis_actual = paciente.get("dosis", "") or ""
-    medicacion_edit = ""
-    dosis_edit = ""
+    # Inicializar la lista editable en session_state
+    if "edit_meds_lista" not in st.session_state or st.session_state.get("edit_meds_para_codigo") != paciente["codigo"]:
+        lista_actual = parse_medicaciones(paciente)
+        st.session_state.edit_meds_lista = lista_actual if lista_actual else [{"nombre": "", "dosis": ""}]
+        st.session_state.edit_meds_para_codigo = paciente["codigo"]
+
     if toma_med_edit == "Sí":
-        medicacion_edit = st.text_input("¿Qué medicación tomás?", value=med_actual, placeholder="Ej: Enalapril", key="edit_medicacion")
-        dosis_edit = st.text_input("¿Cuál es la dosis?", value=dosis_actual, placeholder="Ej: 10mg cada 12hs", key="edit_dosis")
-    if st.button("Guardar cambios de medicación", use_container_width=True, key="btn_guardar_med"):
-        if toma_med_edit == "Sí" and (not medicacion_edit.strip() or not dosis_edit.strip()):
-            st.error("Completá la medicación y la dosis, o seleccioná \"No\".")
+        for i, m in enumerate(st.session_state.edit_meds_lista):
+            cols_med = st.columns([5, 5, 1])
+            with cols_med[0]:
+                st.session_state.edit_meds_lista[i]["nombre"] = st.text_input(
+                    f"Medicación {i+1}", value=m.get("nombre", ""), placeholder="Ej: Enalapril",
+                    key=f"med_nombre_{i}", label_visibility="visible" if i == 0 else "collapsed",
+                )
+            with cols_med[1]:
+                st.session_state.edit_meds_lista[i]["dosis"] = st.text_input(
+                    f"Dosis {i+1}", value=m.get("dosis", ""), placeholder="Ej: 10mg cada 12hs",
+                    key=f"med_dosis_{i}", label_visibility="visible" if i == 0 else "collapsed",
+                )
+            with cols_med[2]:
+                st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True) if i == 0 else None
+                if len(st.session_state.edit_meds_lista) > 1:
+                    if st.button("🗑️", key=f"del_med_{i}", help="Eliminar esta medicación"):
+                        st.session_state.edit_meds_lista.pop(i)
+                        st.rerun()
+        if st.button("➕ Agregar otra medicación", key="btn_add_med"):
+            st.session_state.edit_meds_lista.append({"nombre": "", "dosis": ""})
+            st.rerun()
+
+    if st.button("Guardar cambios de medicación", use_container_width=True, key="btn_guardar_med", type="primary"):
+        if toma_med_edit == "Sí":
+            cleaned = [m for m in st.session_state.edit_meds_lista if (m.get("nombre") or "").strip()]
+            if not cleaned:
+                st.error("Cargá al menos una medicación con nombre, o seleccioná \"No\".")
+            else:
+                for m in cleaned:
+                    if not m.get("dosis", "").strip():
+                        st.error(f'Completá la dosis de "{m["nombre"]}".')
+                        break
+                else:
+                    actualizar_paciente(paciente["codigo"], {
+                        "toma_medicacion": True,
+                        "medicacion": serializar_medicaciones(cleaned),
+                        "dosis": cleaned[0].get("dosis", ""),  # backward compat
+                    })
+                    st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
+                    st.success("✅ Medicación actualizada correctamente.")
+                    st.session_state.pop("edit_meds_lista", None)
+                    st.session_state.pop("edit_meds_para_codigo", None)
+                    st.rerun()
         else:
             actualizar_paciente(paciente["codigo"], {
-                "toma_medicacion": toma_med_edit == "Sí",
-                "medicacion": medicacion_edit if toma_med_edit == "Sí" else "",
-                "dosis": dosis_edit if toma_med_edit == "Sí" else "",
+                "toma_medicacion": False,
+                "medicacion": "",
+                "dosis": "",
             })
             st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
             st.success("✅ Medicación actualizada correctamente.")
+            st.session_state.pop("edit_meds_lista", None)
+            st.session_state.pop("edit_meds_para_codigo", None)
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1449,11 +1658,11 @@ elif st.session_state.vista == "paciente_ajustes":
     with col_d2:
         st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:18px;">{paciente.get("sexo","—")}</div><div class="art-metric-label">Sexo biológico</div></div>', unsafe_allow_html=True)
     with col_d3:
-        med_txt = paciente.get("medicacion", "Ninguna") or "Ninguna"
-        st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:16px;">{med_txt}</div><div class="art-metric-label">Medicación</div></div>', unsafe_allow_html=True)
+        med_txt = medicaciones_texto(paciente)
+        st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:14px;line-height:1.3;">{med_txt}</div><div class="art-metric-label">Medicación</div></div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("← Volver al inicio"):
+    if st.button("← Volver al inicio", key="btn_volver_bottom"):
         st.session_state.vista = "paciente_home"
         st.rerun()
 
@@ -1617,26 +1826,55 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             edad = st.number_input("Edad", min_value=1, max_value=120, step=1)
             sexo = st.selectbox("Sexo biológico", ["Femenino", "Masculino", "Otro"])
             toma_med = st.radio("¿Tomás medicación para la presión arterial?", ["No", "Sí"], horizontal=True)
-            medicacion = ""
-            dosis = ""
+
+            if "reg_meds_lista" not in st.session_state:
+                st.session_state.reg_meds_lista = [{"nombre": "", "dosis": ""}]
+
             if toma_med == "Sí":
-                medicacion = st.text_input("¿Qué medicación tomás?", placeholder="Ej: Enalapril")
-                dosis = st.text_input("¿Cuál es la dosis?", placeholder="Ej: 10mg cada 12hs")
+                st.caption("Podés agregar varias medicaciones con su dosis.")
+                for i, m in enumerate(st.session_state.reg_meds_lista):
+                    cols_reg = st.columns([5, 5, 1])
+                    with cols_reg[0]:
+                        st.session_state.reg_meds_lista[i]["nombre"] = st.text_input(
+                            f"Medicación {i+1}", value=m.get("nombre", ""),
+                            placeholder="Ej: Enalapril", key=f"reg_med_n_{i}",
+                            label_visibility="visible" if i == 0 else "collapsed",
+                        )
+                    with cols_reg[1]:
+                        st.session_state.reg_meds_lista[i]["dosis"] = st.text_input(
+                            f"Dosis {i+1}", value=m.get("dosis", ""),
+                            placeholder="Ej: 10mg cada 12hs", key=f"reg_med_d_{i}",
+                            label_visibility="visible" if i == 0 else "collapsed",
+                        )
+                    with cols_reg[2]:
+                        if len(st.session_state.reg_meds_lista) > 1:
+                            if st.button("🗑️", key=f"reg_del_med_{i}"):
+                                st.session_state.reg_meds_lista.pop(i)
+                                st.rerun()
+                if st.button("➕ Agregar otra medicación", key="reg_btn_add_med"):
+                    st.session_state.reg_meds_lista.append({"nombre": "", "dosis": ""})
+                    st.rerun()
+
             recordatorios = st.checkbox("✉️ Quiero recibir recordatorios por email para cargar mi presión arterial", value=True)
             st.markdown('<div style="font-size:11px;color:#64748b;margin-top:-8px;">Recibirás un recordatorio a las 7 hs y a las 19 hs cada día durante los 7 días del seguimiento.</div>', unsafe_allow_html=True)
             enviado = st.button("Guardar y comenzar →", use_container_width=True, key="btn_registro_paciente")
             if enviado and edad:
-                if toma_med == "Sí" and (not medicacion.strip() or not dosis.strip()):
-                    st.error("Por favor completá la medicación y la dosis antes de continuar.")
+                meds_valid = [m for m in st.session_state.reg_meds_lista if (m.get("nombre") or "").strip()]
+                if toma_med == "Sí" and not meds_valid:
+                    st.error("Cargá al menos una medicación con nombre, o seleccioná \"No\".")
+                elif toma_med == "Sí" and any(not (m.get("dosis") or "").strip() for m in meds_valid):
+                    st.error("Completá la dosis de todas las medicaciones cargadas.")
                 else:
                     actualizar_paciente(codigo, {
                         "edad": int(edad), "sexo": sexo,
                         "toma_medicacion": toma_med == "Sí",
-                        "medicacion": medicacion, "dosis": dosis,
+                        "medicacion": serializar_medicaciones(meds_valid) if toma_med == "Sí" else "",
+                        "dosis": (meds_valid[0]["dosis"] if (toma_med == "Sí" and meds_valid) else ""),
                         "recordatorios_email": recordatorios,
                         "consentimiento_aceptado": True
                     })
                     st.session_state.paciente_data = buscar_paciente(codigo)
+                    st.session_state.pop("reg_meds_lista", None)
                     st.success("✅ ¡Registro completado!")
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1746,7 +1984,7 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                                 with cf2:
                                     dia_a = st.number_input("Diastólica", min_value=40, max_value=150, value=80, step=1, key=f"dia_atr_{atr_key}")
                                 with cf3:
-                                    pulso_a = st.number_input("Pulso (lpm)", min_value=30, max_value=220, value=70, step=1, key=f"pul_atr_{atr_key}")
+                                    pulso_a = st.number_input("Pulso (bpm)", min_value=30, max_value=220, value=70, step=1, key=f"pul_atr_{atr_key}")
                                 confirmar_a = st.checkbox("Confirmo valores correctos (si son elevados)", key=f"conf_atr_{atr_key}")
                                 cb1, cb2 = st.columns(2)
                                 with cb1:
@@ -1785,16 +2023,28 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{resultado["sis_general"]}/{resultado["dia_general"]}</div><div class="art-metric-label">Promedio general</div></div>', unsafe_allow_html=True)
                 with c4:
                     pulso_avg = resultado.get("pulso_general")
-                    pulso_disp = f"{pulso_avg} lpm" if pulso_avg else "—"
+                    pulso_disp = f"{pulso_avg} bpm" if pulso_avg else "—"
                     st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{pulso_disp}</div><div class="art-metric-label">Pulso promedio</div></div>', unsafe_allow_html=True)
                 st.caption("El resultado promedia los registros de los días 2 a 7 (se descarta el día 1, según protocolo).")
+                st.markdown("**Presión arterial**")
                 grafico_evolucion(mediciones)
+                st.markdown("**Frecuencia cardíaca**")
+                grafico_pulso(mediciones)
                 if resultado["tipo"] == "success":
                     st.success(f"**{resultado['titulo']}** — {resultado['mensaje']}")
                 elif resultado["tipo"] == "warning":
                     st.warning(f"**{resultado['titulo']}** — {resultado['mensaje']}")
                 else:
                     st.error(f"**{resultado['titulo']}** — {resultado['mensaje']}")
+
+                # Mini conclusión orientativa
+                st.markdown(
+                    f'<div style="background:rgba(59,130,246,0.06);border-left:3px solid #3b82f6;'
+                    f'padding:12px 16px;border-radius:6px;margin-top:0.75rem;font-size:14px;color:#cbd5e1;line-height:1.6;">'
+                    f'<strong style="color:#e8eef7;">🩺 Conclusión orientativa:</strong><br>'
+                    f'{generar_conclusion(resultado, mediciones)}'
+                    f'</div>',
+                    unsafe_allow_html=True)
 
                 # Exportar PDF
                 eventos = obtener_eventos_adversos(codigo)
@@ -1822,7 +2072,10 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             """, unsafe_allow_html=True)
             if total >= 4:
                 with st.expander("📈 Ver evolución hasta ahora"):
+                    st.markdown("**Presión arterial**")
                     grafico_evolucion(mediciones)
+                    st.markdown("**Frecuencia cardíaca**")
+                    grafico_pulso(mediciones)
         else:
             # Mensaje grande de transición cuando terminó la mañana y faltan tomas de la tarde
             if terminada_manana and es_tarde:
@@ -1850,7 +2103,7 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 with col_f2:
                     dia = st.number_input("Diastólica (menor)", min_value=40, max_value=150, value=80, step=1)
                 with col_f3:
-                    pulso = st.number_input("Pulso (lpm)", min_value=30, max_value=220, value=70, step=1, help="Frecuencia cardíaca que muestra tu tensiómetro")
+                    pulso = st.number_input("Pulso (bpm)", min_value=30, max_value=220, value=70, step=1, help="Frecuencia cardíaca que muestra tu tensiómetro")
                 confirmar_alto = st.checkbox("Confirmo que los valores son correctos (requerido si son muy elevados)")
                 guardar_btn = st.form_submit_button("Guardar medición →", use_container_width=True)
             if guardar_btn:
@@ -1863,7 +2116,10 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
 
             if total >= 2:
                 with st.expander("📈 Ver evolución hasta ahora"):
+                    st.markdown("**Presión arterial**")
                     grafico_evolucion(mediciones)
+                    st.markdown("**Frecuencia cardíaca**")
+                    grafico_pulso(mediciones)
 
         # Editor de tomas del día (editables solo si <12hs)
         if med_dia:
@@ -1871,7 +2127,7 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 for m in med_dia:
                     momento_disp = m["momento"].replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
                     editable = puede_editar(m)
-                    pulso_disp = f"· {m.get('pulso','—')} lpm" if m.get("pulso") else ""
+                    pulso_disp = f"· {m.get('pulso','—')} bpm" if m.get("pulso") else ""
                     edit_state_key = f"editando_{m['id']}"
 
                     if st.session_state.get(edit_state_key):
@@ -2076,7 +2332,14 @@ elif st.session_state.vista == "medico_home":
                             unsafe_allow_html=True)
 
                     if total >= 4:
+                        st.markdown("**Presión arterial**")
                         grafico_evolucion(mediciones)
+                        st.markdown("**Frecuencia cardíaca**")
+                        grafico_pulso(mediciones)
+
+                    # Mini conclusión clínica
+                    if resultado:
+                        st.markdown(f'<div style="background:rgba(59,130,246,0.06);border-left:3px solid #3b82f6;padding:10px 14px;border-radius:6px;margin-top:0.5rem;font-size:13px;color:#cbd5e1;line-height:1.5;">{generar_conclusion(resultado, mediciones)}</div>', unsafe_allow_html=True)
 
                     # Eventos adversos y alertas
                     eventos_p = obtener_eventos_adversos(p["codigo"])

@@ -1608,9 +1608,10 @@ elif st.session_state.vista == "paciente_ajustes":
                     key=f"med_dosis_{i}", label_visibility="visible" if i == 0 else "collapsed",
                 )
             with cols_med[2]:
-                st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True) if i == 0 else None
+                if i == 0:
+                    st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True)
                 if len(st.session_state.edit_meds_lista) > 1:
-                    if st.button("🗑️", key=f"del_med_{i}", help="Eliminar esta medicación"):
+                    if st.button("🗑️", key=f"del_med_{i}"):
                         st.session_state.edit_meds_lista.pop(i)
                         st.rerun()
         if st.button("➕ Agregar otra medicación", key="btn_add_med"):

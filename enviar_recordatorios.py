@@ -31,6 +31,10 @@ def contar_mediciones(codigo):
 
 
 def html_recordatorio(nombre):
+    # El link va al home; si el paciente tiene sesión activa en ese navegador
+    # (cookie "recordarme 30 días"), entra directo al formulario de carga.
+    # Si no, pasa por login.
+    cargar_url = f"{APP_URL}/?vista=paciente"
     return f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a1628;color:#e8eef7;border-radius:12px;overflow:hidden;">
       <div style="background:#1d4ed8;padding:24px 32px;">
@@ -40,10 +44,11 @@ def html_recordatorio(nombre):
       <div style="padding:32px;">
         <p style="font-size:16px;">Hola {nombre},</p>
         <p style="color:#94a3b8;line-height:1.6;">Es momento de cargar tu presión arterial en Arteris.
-        Recordá tomar la medición en reposo y registrar los dos valores.</p>
+        Recordá tomar la medición en reposo y registrar los dos valores y la frecuencia cardíaca.</p>
         <div style="text-align:center;margin:32px 0;">
-          <a href="{APP_URL}" style="background:#1d4ed8;color:white;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:15px;display:inline-block;">Cargar mi presión</a>
+          <a href="{cargar_url}" style="background:#1d4ed8;color:white;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:15px;display:inline-block;">Cargar mi presión arterial →</a>
         </div>
+        <p style="font-size:13px;color:#94a3b8;text-align:center;">Si ya iniciaste sesión en este navegador, te lleva directo a la pantalla de carga.</p>
         <p style="font-size:11px;color:#64748b;">Podés desactivar estos recordatorios desde Ajustes en la plataforma.</p>
       </div>
     </div>"""

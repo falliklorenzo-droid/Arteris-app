@@ -1,14 +1,22 @@
 import streamlit as st
 from supabase import create_client, Client
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 import resend
 import uuid
 import os
 import io
+import secrets as _secrets
 import hashlib
 import bcrypt
 import pandas as pd
 import altair as alt
+
+# Zona horaria fija Argentina (UTC-3). Toda la lógica de "día actual" usa esta zona.
+ARG_TZ = timezone(timedelta(hours=-3))
+def hoy_arg():
+    return datetime.now(ARG_TZ).date()
+def now_arg():
+    return datetime.now(ARG_TZ)
 
 st.set_page_config(
     page_title="Monitoreo Domiciliario de Presión Arterial · Arteris",
@@ -302,18 +310,36 @@ def crear_paciente(nombre, apellido, email, medico_id):
     }).execute()
     return codigo
 
-def guardar_medicion(codigo, sistolica, diastolica, momento):
-    get_sb().table("mediciones").insert({
+def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_dia=None, atrasada=False):
+    """Guarda una medición. Si fecha_dia se especifica, la toma se asigna a ese día
+    (formato YYYY-MM-DD) y se marca como atrasada."""
+    ahora = now_arg()
+    if fecha_dia:
+        # Carga atrasada: usar la fecha del día específico + hora actual
+        fecha_iso = f"{fecha_dia}T{ahora.strftime('%H:%M:%S')}-03:00"
+        atrasada = True
+    else:
+        fecha_iso = ahora.isoformat()
+    payload = {
         "codigo_paciente": codigo,
         "sistolica": sistolica,
         "diastolica": diastolica,
         "momento": momento,
-        "fecha": datetime.now().isoformat()
-    }).execute()
+        "fecha": fecha_iso,
+        "cargada_atrasada": atrasada,
+        "creada_at": ahora.isoformat(),
+    }
+    if pulso is not None:
+        payload["pulso"] = pulso
+    get_sb().table("mediciones").insert(payload).execute()
     # Alerta automática por toma elevada
     if sistolica >= 180 or diastolica >= 110:
         generar_alerta(codigo, "toma_elevada",
                        f"Toma elevada registrada: {sistolica}/{diastolica} mmHg ({momento}).")
+    # Alerta automática por taquicardia
+    if pulso is not None and pulso >= 110:
+        generar_alerta(codigo, "pulso_elevado",
+                       f"Frecuencia cardíaca elevada: {pulso} lpm ({momento}).")
     # Alerta automática al completar el monitoreo
     try:
         meds = obtener_mediciones(codigo)
@@ -325,6 +351,21 @@ def guardar_medicion(codigo, sistolica, diastolica, momento):
                                f"({res['sis_general']}/{res['dia_general']} mmHg promedio).")
     except Exception:
         pass
+
+def editar_medicion(medicion_id, sistolica, diastolica, pulso=None):
+    """Edita una medición existente (solo dentro del plazo de 12hs validado en UI)."""
+    payload = {
+        "sistolica": sistolica,
+        "diastolica": diastolica,
+        "editada_at": now_arg().isoformat(),
+    }
+    if pulso is not None:
+        payload["pulso"] = pulso
+    try:
+        get_sb().table("mediciones").update(payload).eq("id", medicion_id).execute()
+        return True
+    except Exception:
+        return False
 
 def obtener_mediciones(codigo):
     r = get_sb().table("mediciones").select("*").eq("codigo_paciente", codigo).order("fecha").execute()
@@ -362,6 +403,62 @@ def buscar_medico_por_reset_token(token):
 def actualizar_medico(email, datos):
     get_sb().table("medicos").update(datos).eq("email", email).execute()
 
+# ── Sesión persistente ("recordarme 30 días") ────────────────────────────────
+def crear_session_paciente(codigo):
+    token = _secrets.token_urlsafe(32)
+    expires = now_arg() + timedelta(days=30)
+    try:
+        actualizar_paciente(codigo, {"session_token": token, "session_expires": expires.isoformat()})
+        return token
+    except Exception:
+        return None
+
+def crear_session_medico(email):
+    token = _secrets.token_urlsafe(32)
+    expires = now_arg() + timedelta(days=30)
+    try:
+        actualizar_medico(email, {"session_token": token, "session_expires": expires.isoformat()})
+        return token
+    except Exception:
+        return None
+
+def validar_session(token):
+    """Devuelve (tipo, registro) si el token es válido y no expiró. Si no, (None, None)."""
+    if not token:
+        return None, None
+    try:
+        r = get_sb().table("pacientes").select("*").eq("session_token", token).execute()
+        if r.data:
+            p = r.data[0]
+            exp = p.get("session_expires")
+            if exp and pd.to_datetime(exp) > pd.to_datetime(now_arg()):
+                return "paciente", p
+    except Exception:
+        pass
+    try:
+        r = get_sb().table("medicos").select("*").eq("session_token", token).execute()
+        if r.data:
+            m = r.data[0]
+            exp = m.get("session_expires")
+            if exp and pd.to_datetime(exp) > pd.to_datetime(now_arg()):
+                return "medico", m
+    except Exception:
+        pass
+    return None, None
+
+def invalidar_session(token):
+    """Borra el token de la DB al cerrar sesión."""
+    if not token:
+        return
+    try:
+        get_sb().table("pacientes").update({"session_token": None, "session_expires": None}).eq("session_token", token).execute()
+    except Exception:
+        pass
+    try:
+        get_sb().table("medicos").update({"session_token": None, "session_expires": None}).eq("session_token", token).execute()
+    except Exception:
+        pass
+
 def crear_medico(nombre, apellido, email):
     get_sb().table("medicos").insert({
         "nombre": nombre,
@@ -375,7 +472,7 @@ def guardar_nota_medico(codigo_paciente, medico_id, nota):
         "codigo_paciente": codigo_paciente,
         "medico_id": medico_id,
         "nota": nota,
-        "fecha": datetime.now().isoformat()
+        "fecha": now_arg().isoformat()
     }).execute()
 
 def obtener_notas_medico(codigo_paciente, medico_id):
@@ -394,7 +491,7 @@ def guardar_evento_adverso(codigo_paciente, descripcion, reportado_por="paciente
             "codigo_paciente": codigo_paciente,
             "descripcion": descripcion,
             "reportado_por": reportado_por,
-            "fecha": datetime.now().isoformat()
+            "fecha": now_arg().isoformat()
         }).execute()
         return True
     except Exception:
@@ -415,7 +512,7 @@ def generar_alerta(codigo_paciente, tipo, mensaje):
             "codigo_paciente": codigo_paciente,
             "tipo": tipo,
             "mensaje": mensaje,
-            "fecha": datetime.now().isoformat()
+            "fecha": now_arg().isoformat()
         }).execute()
     except Exception:
         pass
@@ -545,6 +642,64 @@ def enviar_reset_password(email, link, nombre=""):
         return False
 
 # ── Lógica médica ─────────────────────────────────────────────────────────────
+def fecha_inicio_protocolo(mediciones):
+    """Devuelve la fecha del día 1 del protocolo (fecha de la primera medición).
+    Si no hay mediciones aún, devuelve la fecha de hoy en Argentina."""
+    if not mediciones:
+        return hoy_arg()
+    fechas = [pd.to_datetime(m["fecha"]).date() for m in mediciones]
+    return min(fechas)
+
+def dia_protocolo_actual(mediciones):
+    """Devuelve el número de día del protocolo (1 a 7) según la fecha de hoy en Argentina."""
+    if not mediciones:
+        return 1
+    inicio = fecha_inicio_protocolo(mediciones)
+    transcurridos = (hoy_arg() - inicio).days + 1
+    return max(1, min(transcurridos, 7))
+
+def fecha_de_dia(mediciones, dia_num):
+    """Devuelve la fecha calendario que corresponde al día N del protocolo."""
+    inicio = fecha_inicio_protocolo(mediciones)
+    return inicio + timedelta(days=dia_num - 1)
+
+def tomas_de_dia(mediciones, dia_num):
+    """Devuelve la lista de tomas (registros) que corresponden al día N del protocolo."""
+    fecha_dia = fecha_de_dia(mediciones, dia_num)
+    return [m for m in mediciones if pd.to_datetime(m["fecha"]).date() == fecha_dia]
+
+def dias_con_faltantes(mediciones, hasta_dia=None):
+    """Devuelve los días anteriores al actual que NO tienen las 4 tomas completas."""
+    if not mediciones:
+        return []
+    dia_actual = dia_protocolo_actual(mediciones)
+    tope = hasta_dia if hasta_dia is not None else dia_actual
+    faltantes = []
+    for d in range(1, tope):  # solo días pasados
+        tomas = tomas_de_dia(mediciones, d)
+        if len(tomas) < 4:
+            faltantes.append({
+                "dia": d,
+                "fecha": fecha_de_dia(mediciones, d),
+                "tomas_cargadas": len(tomas),
+                "momentos_cargados": [t["momento"] for t in tomas],
+            })
+    return faltantes
+
+def puede_editar(medicion):
+    """Una medición se puede editar dentro de las 12hs de creada (carga atrasada sigue valiendo desde su creación)."""
+    creada = medicion.get("creada_at") or medicion.get("fecha")
+    if not creada:
+        return False
+    try:
+        creada_dt = pd.to_datetime(creada)
+        if creada_dt.tz is None:
+            creada_dt = creada_dt.tz_localize(ARG_TZ)
+        ahora = pd.to_datetime(now_arg())
+        return (ahora - creada_dt) < pd.Timedelta(hours=12)
+    except Exception:
+        return False
+
 def calcular_resultado(mediciones):
     """Calcula promedios y categoría del HBPM. Requiere las 28 tomas (7 días x 4).
     Descarta el día 1 y usa los días 2 a 7. Devuelve un dict o None."""
@@ -570,6 +725,11 @@ def calcular_resultado(mediciones):
     manana = df[df["periodo"] == "mañana"]
     tarde = df[df["periodo"] == "tarde"]
 
+    df["pulso_num"] = pd.to_numeric(df.get("pulso"), errors="coerce") if "pulso" in df.columns else None
+    pulso_general = None
+    if "pulso_num" in df.columns and df["pulso_num"].notna().any():
+        pulso_general = round(df["pulso_num"].mean(), 1)
+
     res = {
         "sis_manana": round(manana["sistolica"].mean(), 1) if not manana.empty else None,
         "dia_manana": round(manana["diastolica"].mean(), 1) if not manana.empty else None,
@@ -577,6 +737,7 @@ def calcular_resultado(mediciones):
         "dia_tarde": round(tarde["diastolica"].mean(), 1) if not tarde.empty else None,
         "sis_general": round(df["sistolica"].mean(), 1),
         "dia_general": round(df["diastolica"].mean(), 1),
+        "pulso_general": pulso_general,
         "dias_usados": len(dias_validos),
     }
 
@@ -702,7 +863,7 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
     pdf.cell(0, 6, t(f"Código: {paciente.get('codigo','')}"), 0, 1)
     pdf.cell(95, 6, t(f"Edad: {paciente.get('edad','-')}"), 0, 0)
     pdf.cell(0, 6, t(f"Sexo: {paciente.get('sexo','-')}"), 0, 1)
-    pdf.cell(0, 6, t(f"Fecha del informe: {datetime.now().strftime('%d/%m/%Y')}"), 0, 1)
+    pdf.cell(0, 6, t(f"Fecha del informe: {now_arg().strftime('%d/%m/%Y')}"), 0, 1)
     pdf.ln(3)
 
     # Tratamiento médico
@@ -738,7 +899,13 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
             for j, mom in enumerate(orden):
                 fila = sub[sub["momento"] == mom]
                 if not fila.empty:
-                    v = f"{int(fila.iloc[0]['sistolica'])}/{int(fila.iloc[0]['diastolica'])}"
+                    r0 = fila.iloc[0]
+                    sis_v = int(r0["sistolica"])
+                    dia_v = int(r0["diastolica"])
+                    pulso_v = r0.get("pulso") if "pulso" in fila.columns else None
+                    v = f"{sis_v}/{dia_v}"
+                    if pulso_v is not None and pd.notna(pulso_v):
+                        v += f" · {int(pulso_v)} lpm"
                 else:
                     v = "-"
                 pdf.cell(anchos[j + 1], 7, t(v), 1, 0, "C")
@@ -753,6 +920,8 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
         pdf.cell(0, 6, t(f"Promedio mañana: {resultado.get('sis_manana','-')}/{resultado.get('dia_manana','-')} mmHg"), 0, 1)
         pdf.cell(0, 6, t(f"Promedio tarde: {resultado.get('sis_tarde','-')}/{resultado.get('dia_tarde','-')} mmHg"), 0, 1)
         pdf.cell(0, 6, t(f"Promedio general (días 2 a 7): {resultado.get('sis_general','-')}/{resultado.get('dia_general','-')} mmHg"), 0, 1)
+        if resultado.get("pulso_general") is not None:
+            pdf.cell(0, 6, t(f"Frecuencia cardíaca promedio: {resultado.get('pulso_general')} lpm"), 0, 1)
         pdf.ln(1)
         titulo_limpio = "".join(c for c in resultado.get("titulo", "") if ord(c) < 256).strip()
         pdf.set_font("Helvetica", "B", 10)
@@ -821,6 +990,8 @@ if "vista" not in st.session_state:
         st.session_state.vista = "paciente_login"
     elif vista_url == "medico":
         st.session_state.vista = "medico_login"
+    elif vista_url == "paciente":
+        st.session_state.vista = "paciente_login"
     else:
         st.session_state.vista = "inicio"
 
@@ -841,7 +1012,76 @@ if "activar_medico_token" not in st.session_state:
 if "reset_token" not in st.session_state:
     st.session_state.reset_token = params.get("reset", "")
 
+# ── Sesión persistente 30 días (cookie) ───────────────────────────────────────
+# extra_streamlit_components no está disponible en todos los entornos; degradamos a sesión efímera.
+try:
+    import extra_streamlit_components as stx
+    cookie_manager = stx.CookieManager(key="arteris_cookie_mgr")
+except Exception:
+    cookie_manager = None
+
+def set_session_cookie(token, expires):
+    if cookie_manager is None or not token:
+        return
+    try:
+        cookie_manager.set("arteris_session", token, expires_at=expires, key="set_arteris_cookie")
+    except Exception:
+        pass
+
+def clear_session_cookie():
+    if cookie_manager is None:
+        return
+    try:
+        cookie_manager.delete("arteris_session", key="del_arteris_cookie")
+    except Exception:
+        pass
+
+def leer_session_cookie():
+    if cookie_manager is None:
+        return None
+    try:
+        return cookie_manager.get("arteris_session")
+    except Exception:
+        return None
+
+def iniciar_sesion_persistente(tipo, ident):
+    """Crea un token de sesión en DB y lo guarda en cookie (30 días)."""
+    expires = now_arg() + timedelta(days=30)
+    token = None
+    if tipo == "paciente":
+        token = crear_session_paciente(ident)
+    elif tipo == "medico":
+        token = crear_session_medico(ident)
+    if token:
+        set_session_cookie(token, expires)
+
+# Restaurar sesión desde cookie si todavía no hay rol cargado.
+# Nota: el componente de cookies puede tardar 1 render en estar listo, así que
+# si en el primer intento no devuelve nada hacemos un rerun único para reintentar.
+if cookie_manager is not None and not st.session_state.get("rol"):
+    tok_cookie = leer_session_cookie()
+    if tok_cookie:
+        tipo, registro = validar_session(tok_cookie)
+        if registro:
+            if tipo == "paciente":
+                st.session_state.paciente_data = registro
+                st.session_state.codigo_paciente = registro.get("codigo", "")
+                st.session_state.rol = "paciente"
+                st.session_state.vista = "paciente_home"
+            elif tipo == "medico":
+                st.session_state.medico_data = registro
+                st.session_state.rol = "medico"
+                st.session_state.vista = "medico_home"
+    elif not st.session_state.get("_cookie_retry_done"):
+        st.session_state["_cookie_retry_done"] = True
+        st.rerun()
+
 def cerrar_sesion():
+    # Limpiar cookie + token en DB
+    tok = leer_session_cookie()
+    if tok:
+        invalidar_session(tok)
+    clear_session_cookie()
     for k in ["vista", "usuario", "rol", "medico_data", "paciente_data", "codigo_paciente", "consentimiento_ok"]:
         if k in st.session_state:
             del st.session_state[k]
@@ -1013,6 +1253,7 @@ if st.session_state.activar_medico_token:
                     st.session_state.rol = "medico"
                     st.session_state.activar_medico_token = ""
                     st.session_state.vista = "medico_home"
+                    iniciar_sesion_persistente("medico", medico["email"])
                     st.success("✅ ¡Cuenta activada! Bienvenido a Arteris.")
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -1215,6 +1456,7 @@ elif st.session_state.vista == "paciente_login":
                         st.session_state.paciente_data = paciente
                         st.session_state.rol = "paciente"
                         st.session_state.vista = "paciente_home"
+                        iniciar_sesion_persistente("paciente", paciente["codigo"])
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
             elif paciente and paciente.get("password_set"):
@@ -1231,8 +1473,7 @@ elif st.session_state.vista == "paciente_login":
             # Login normal con email y contraseña
             tab_login, tab_reset = st.tabs(["Iniciar sesión", "Olvidé mi contraseña"])
             with tab_login:
-                st.markdown('<div class="art-card">', unsafe_allow_html=True)
-                st.markdown("### Ingresar a Arteris")
+                st.markdown('<div class="art-card"><h3 style="margin-top:0;">Ingresar a Arteris</h3>', unsafe_allow_html=True)
                 with st.form("form_login_paciente"):
                     email_input = st.text_input("Email", placeholder="tu@email.com")
                     pwd_input = st.text_input("Contraseña", type="password")
@@ -1248,6 +1489,7 @@ elif st.session_state.vista == "paciente_login":
                             st.session_state.codigo_paciente = paciente["codigo"]
                             st.session_state.rol = "paciente"
                             st.session_state.vista = "paciente_home"
+                            iniciar_sesion_persistente("paciente", paciente["codigo"])
                             st.rerun()
                         else:
                             st.error("❌ Contraseña incorrecta.")
@@ -1255,8 +1497,7 @@ elif st.session_state.vista == "paciente_login":
                         st.error("❌ Email no encontrado o cuenta no activada.")
                 st.markdown('</div>', unsafe_allow_html=True)
             with tab_reset:
-                st.markdown('<div class="art-card">', unsafe_allow_html=True)
-                st.markdown("### Recuperar contraseña")
+                st.markdown('<div class="art-card"><h3 style="margin-top:0;">Recuperar contraseña</h3>', unsafe_allow_html=True)
                 email_reset = st.text_input("Tu email registrado")
                 if st.button("Enviar instrucciones", use_container_width=True):
                     paciente = buscar_paciente_por_email(email_reset.strip().lower())
@@ -1365,12 +1606,16 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
     else:
         mediciones = obtener_mediciones(codigo)
         total = len(mediciones)
-        hoy = date.today()
-        med_hoy = [m for m in mediciones if pd.to_datetime(m["fecha"]).date() == hoy]
-        momentos_hoy = [m["momento"] for m in med_hoy]
+        dia_actual = dia_protocolo_actual(mediciones) if mediciones else 1
+        # Si no hay mediciones todavía, hoy es el día 1
+        fecha_dia_actual = fecha_de_dia(mediciones, dia_actual) if mediciones else hoy_arg()
+
+        med_dia = tomas_de_dia(mediciones, dia_actual) if mediciones else []
+        momentos_dia = [m["momento"] for m in med_dia]
         tomas_orden = ["mañana-1", "mañana-2", "tarde-1", "tarde-2"]
-        proxima = next((tt for tt in tomas_orden if tt not in momentos_hoy), None)
-        dias_completos = len(set(pd.to_datetime(m["fecha"]).date() for m in mediciones))
+        proxima = next((tt for tt in tomas_orden if tt not in momentos_dia), None)
+        dias_completos = sum(1 for d in range(1, 8) if len(tomas_de_dia(mediciones, d)) >= 4)
+        faltantes = dias_con_faltantes(mediciones) if mediciones else []
 
         col_h1, col_h2 = st.columns([2, 1])
         with col_h1:
@@ -1383,13 +1628,43 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         with col_h2:
             st.markdown(f'<div class="art-metric"><div class="art-metric-num">{dias_completos}/7</div><div class="art-metric-label">Días completados</div></div>', unsafe_allow_html=True)
 
+        # Banner del día actual: "Este es el día N de tu seguimiento"
+        es_manana = proxima is not None and proxima.startswith("mañana")
+        es_tarde = proxima is not None and proxima.startswith("tarde")
+        terminada_manana = "mañana-1" in momentos_dia and "mañana-2" in momentos_dia
+        terminado_dia = proxima is None
+        if total < 28:
+            if terminado_dia:
+                banner_color = "#10b981"
+                banner_emoji = "✅"
+                banner_texto = f"Día {dia_actual} — Completaste todas las tomas de hoy"
+            elif es_tarde:
+                banner_color = "#f59e0b"  # naranja para tarde
+                banner_emoji = "🌇"
+                banner_texto = f"Día {dia_actual} — Tomas de la TARDE"
+            else:
+                banner_color = "#3b82f6"  # azul para mañana
+                banner_emoji = "🌅"
+                banner_texto = f"Día {dia_actual} — Tomas de la MAÑANA"
+            st.markdown(f"""
+            <div style="background:linear-gradient(90deg,{banner_color}1f,{banner_color}0a);border:1px solid {banner_color}55;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
+              <div style="font-size:14px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Este es</div>
+              <div style="font-size:22px;color:#e8eef7;font-weight:500;margin-top:4px;">{banner_emoji} {banner_texto}</div>
+              <div style="font-size:12px;color:#64748b;margin-top:6px;">Fecha del día: {fecha_dia_actual.strftime('%d/%m/%Y')}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         dias_labels = ["D1", "D2", "D3", "D4", "D5", "D6", "D7"]
         dias_html = ""
         for i, l in enumerate(dias_labels):
-            if i < dias_completos - 1:
+            d_num = i + 1
+            n_tomas = len(tomas_de_dia(mediciones, d_num)) if mediciones else 0
+            if n_tomas >= 4:
                 cls = "day-done"
-            elif i == dias_completos - 1 and dias_completos > 0:
+            elif d_num == dia_actual:
                 cls = "day-today"
+            elif d_num < dia_actual and n_tomas < 4:
+                cls = "day-pending"  # día pasado incompleto
             else:
                 cls = "day-pending"
             dias_html += f'<div class="day-dot {cls}">{l}</div>'
@@ -1406,9 +1681,59 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         </div>
         """, unsafe_allow_html=True)
 
+        # Aviso de tomas atrasadas
+        if faltantes:
+            with st.expander(f"⚠️ Tenés tomas pendientes de días anteriores ({len(faltantes)} día{'s' if len(faltantes)>1 else ''})", expanded=False):
+                st.markdown('<p style="font-size:13px;color:#94a3b8;">Si te olvidaste de cargar pero tomaste la presión, podés agregar las tomas de días anteriores. Quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
+                for f in faltantes:
+                    tomas_faltantes = [t for t in tomas_orden if t not in f["momentos_cargados"]]
+                    st.markdown(f"**Día {f['dia']}** ({f['fecha'].strftime('%d/%m/%Y')}) — {f['tomas_cargadas']}/4 tomas cargadas.")
+                    for tt in tomas_faltantes:
+                        cols_f = st.columns([3, 1])
+                        with cols_f[0]:
+                            momento_disp = tt.replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
+                            st.caption(f"Falta: {momento_disp}")
+                        with cols_f[1]:
+                            if st.button("Cargar", key=f"btn_atrasada_{f['dia']}_{tt}"):
+                                st.session_state[f"cargando_atrasada"] = {"dia": f["dia"], "fecha": f["fecha"].isoformat(), "momento": tt}
+                                st.rerun()
+                    st.markdown("---")
+
         seccion_pasos()
 
         st.markdown("---")
+
+        # Formulario de carga atrasada si está pendiente
+        if st.session_state.get("cargando_atrasada"):
+            ca = st.session_state["cargando_atrasada"]
+            momento_disp = ca["momento"].replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
+            st.warning(f"📝 Cargando toma atrasada — **Día {ca['dia']}** ({pd.to_datetime(ca['fecha']).date().strftime('%d/%m/%Y')}) · {momento_disp}")
+            with st.form("form_atrasada"):
+                cf1, cf2, cf3 = st.columns(3)
+                with cf1:
+                    sis_a = st.number_input("Sistólica", min_value=60, max_value=250, value=120, step=1, key="sis_atr")
+                with cf2:
+                    dia_a = st.number_input("Diastólica", min_value=40, max_value=150, value=80, step=1, key="dia_atr")
+                with cf3:
+                    pulso_a = st.number_input("Pulso (lpm)", min_value=30, max_value=220, value=70, step=1, key="pul_atr")
+                confirmar_a = st.checkbox("Confirmo valores correctos (si son elevados)")
+                c_btn1, c_btn2 = st.columns(2)
+                with c_btn1:
+                    guardar_a = st.form_submit_button("Guardar toma atrasada", use_container_width=True)
+                with c_btn2:
+                    cancelar_a = st.form_submit_button("Cancelar", use_container_width=True)
+            if guardar_a:
+                if (sis_a > 200 or dia_a > 120) and not confirmar_a:
+                    st.warning(f"⚠️ Los valores {sis_a}/{dia_a} son muy elevados. Marcá la casilla de confirmación si son correctos.")
+                else:
+                    guardar_medicion(codigo, sis_a, dia_a, ca["momento"], pulso=int(pulso_a),
+                                     fecha_dia=pd.to_datetime(ca["fecha"]).date().isoformat(), atrasada=True)
+                    del st.session_state["cargando_atrasada"]
+                    st.success("✅ Toma atrasada guardada.")
+                    st.rerun()
+            if cancelar_a:
+                del st.session_state["cargando_atrasada"]
+                st.rerun()
 
         if total >= 28:
             resultado = calcular_resultado(mediciones)
@@ -1422,7 +1747,9 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 with c3:
                     st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{resultado["sis_general"]}/{resultado["dia_general"]}</div><div class="art-metric-label">Promedio general</div></div>', unsafe_allow_html=True)
                 with c4:
-                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{resultado["dias_usados"]}</div><div class="art-metric-label">Días promediados</div></div>', unsafe_allow_html=True)
+                    pulso_avg = resultado.get("pulso_general")
+                    pulso_disp = f"{pulso_avg} lpm" if pulso_avg else "—"
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{pulso_disp}</div><div class="art-metric-label">Pulso promedio</div></div>', unsafe_allow_html=True)
                 st.caption("El resultado promedia los registros de los días 2 a 7 (se descarta el día 1, según protocolo).")
                 grafico_evolucion(mediciones)
                 if resultado["tipo"] == "success":
@@ -1447,38 +1774,107 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 except Exception as e:
                     st.warning(f"No se pudo generar el PDF: {e}")
 
-        elif proxima is None:
-            st.success("✅ Completaste todas las tomas de hoy. ¡Volvé mañana!")
+        elif terminado_dia:
+            # Mensaje grande cuando completó el día
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(16,185,129,0.05));border:1px solid rgba(16,185,129,0.5);border-radius:14px;padding:2rem;text-align:center;margin:1rem 0;">
+              <div style="font-size:60px;line-height:1;">✅</div>
+              <div style="font-family:'DM Serif Display',serif;font-size:28px;color:#e8eef7;margin-top:1rem;">¡Listo por hoy!</div>
+              <p style="color:#94a3b8;margin-top:0.75rem;font-size:15px;">Completaste las 4 tomas del Día {dia_actual}.<br>El sistema avanza automáticamente al Día {min(dia_actual+1,7)} cuando cambie la fecha.</p>
+            </div>
+            """, unsafe_allow_html=True)
             if total >= 4:
-                grafico_evolucion(mediciones)
+                with st.expander("📈 Ver evolución hasta ahora"):
+                    grafico_evolucion(mediciones)
         else:
+            # Mensaje grande de transición cuando terminó la mañana y faltan tomas de la tarde
+            if terminada_manana and es_tarde:
+                st.markdown("""
+                <div style="background:linear-gradient(135deg,rgba(245,158,11,0.18),rgba(245,158,11,0.05));border:1px solid rgba(245,158,11,0.5);border-radius:14px;padding:1.5rem;text-align:center;margin:1rem 0;">
+                  <div style="font-size:50px;line-height:1;">🌇</div>
+                  <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#e8eef7;margin-top:0.5rem;">Terminaste la mañana</div>
+                  <p style="color:#94a3b8;margin-top:0.5rem;font-size:14px;">Ahora corresponden las <strong style="color:#f59e0b;">tomas de la TARDE</strong> (idealmente entre las 18 y 21 hs).<br>Volvé a esta misma pantalla más tarde.</p>
+                </div>
+                """, unsafe_allow_html=True)
+
             momento_display = proxima.replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
+            color_proxima = "#3b82f6" if es_manana else "#f59e0b"
             st.markdown(f"""
             <div class="section-eyebrow">Próxima toma</div>
-            <div style="font-family:'DM Serif Display',serif;font-size:22px;color:#e8eef7;margin-bottom:1rem;">{momento_display}</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:24px;color:{color_proxima};margin-bottom:1rem;">{momento_display}</div>
             """, unsafe_allow_html=True)
             if proxima in ["mañana-2", "tarde-2"]:
                 st.info("⏱ Esperá 1-2 minutos desde la toma anterior.")
 
             with st.form("form_medicion"):
-                col_f1, col_f2 = st.columns(2)
+                col_f1, col_f2, col_f3 = st.columns(3)
                 with col_f1:
-                    sis = st.number_input("Sistólica (número mayor)", min_value=60, max_value=250, value=120, step=1)
+                    sis = st.number_input("Sistólica (mayor)", min_value=60, max_value=250, value=120, step=1)
                 with col_f2:
-                    dia = st.number_input("Diastólica (número menor)", min_value=40, max_value=150, value=80, step=1)
+                    dia = st.number_input("Diastólica (menor)", min_value=40, max_value=150, value=80, step=1)
+                with col_f3:
+                    pulso = st.number_input("Pulso (lpm)", min_value=30, max_value=220, value=70, step=1, help="Frecuencia cardíaca que muestra tu tensiómetro")
                 confirmar_alto = st.checkbox("Confirmo que los valores son correctos (requerido si son muy elevados)")
                 guardar_btn = st.form_submit_button("Guardar medición →", use_container_width=True)
             if guardar_btn:
                 if (sis > 200 or dia > 120) and not confirmar_alto:
                     st.warning(f"⚠️ Los valores {sis}/{dia} son muy elevados. Marcá la casilla de confirmación si son correctos.")
                 else:
-                    guardar_medicion(codigo, sis, dia, proxima)
+                    guardar_medicion(codigo, sis, dia, proxima, pulso=int(pulso))
                     st.success("✅ Medición guardada.")
                     st.rerun()
 
             if total >= 2:
                 with st.expander("📈 Ver evolución hasta ahora"):
                     grafico_evolucion(mediciones)
+
+        # Editor de tomas del día (editables solo si <12hs)
+        if med_dia:
+            with st.expander(f"✏️ Tomas cargadas hoy ({len(med_dia)}/4) — podés editar dentro de las 12hs"):
+                for m in med_dia:
+                    momento_disp = m["momento"].replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
+                    editable = puede_editar(m)
+                    pulso_disp = f"· {m.get('pulso','—')} lpm" if m.get("pulso") else ""
+                    edit_state_key = f"editando_{m['id']}"
+
+                    if st.session_state.get(edit_state_key):
+                        st.markdown(f"**Editando: {momento_disp}**")
+                        with st.form(f"form_edit_{m['id']}"):
+                            cE1, cE2, cE3 = st.columns(3)
+                            with cE1:
+                                sis_e = st.number_input("Sistólica", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{m['id']}")
+                            with cE2:
+                                dia_e = st.number_input("Diastólica", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{m['id']}")
+                            with cE3:
+                                pulso_e = st.number_input("Pulso", min_value=30, max_value=220, value=int(m.get("pulso") or 70), step=1, key=f"e_pul_{m['id']}")
+                            cBE1, cBE2 = st.columns(2)
+                            with cBE1:
+                                ok_edit = st.form_submit_button("Guardar cambios", use_container_width=True)
+                            with cBE2:
+                                cancel_edit = st.form_submit_button("Cancelar", use_container_width=True)
+                        if ok_edit:
+                            if editar_medicion(m["id"], sis_e, dia_e, pulso=int(pulso_e)):
+                                st.success("✅ Toma actualizada.")
+                                del st.session_state[edit_state_key]
+                                st.rerun()
+                            else:
+                                st.error("No se pudo guardar la edición.")
+                        if cancel_edit:
+                            del st.session_state[edit_state_key]
+                            st.rerun()
+                    else:
+                        cL, cR = st.columns([4, 1])
+                        with cL:
+                            atrasada_lbl = " · ⚠️ atrasada" if m.get("cargada_atrasada") else ""
+                            editada_lbl = " · editada" if m.get("editada_at") else ""
+                            st.markdown(f"**{momento_disp}** — {m.get('sistolica')}/{m.get('diastolica')} mmHg {pulso_disp}{atrasada_lbl}{editada_lbl}")
+                        with cR:
+                            if editable:
+                                if st.button("Editar", key=f"btn_edit_{m['id']}"):
+                                    st.session_state[edit_state_key] = True
+                                    st.rerun()
+                            else:
+                                st.caption("No editable (>12hs)")
 
         # Reportar evento adverso / síntoma
         with st.expander("➕ Reportar un evento o síntoma"):
@@ -1509,8 +1905,7 @@ elif st.session_state.vista == "medico_login":
             st.rerun()
         tab_login, tab_reset = st.tabs(["Iniciar sesión", "Olvidé mi contraseña"])
         with tab_login:
-            st.markdown('<div class="art-card">', unsafe_allow_html=True)
-            st.markdown("### 👨‍⚕️ Acceso médico")
+            st.markdown('<div class="art-card"><h3 style="margin-top:0;">👨‍⚕️ Acceso médico</h3>', unsafe_allow_html=True)
             with st.form("form_login_medico"):
                 email_m = st.text_input("Email médico")
                 pwd_m = st.text_input("Contraseña", type="password")
@@ -1533,6 +1928,7 @@ elif st.session_state.vista == "medico_login":
                             st.session_state.medico_data = medico
                             st.session_state.rol = "medico"
                             st.session_state.vista = "medico_home"
+                            iniciar_sesion_persistente("medico", medico["email"])
                             st.rerun()
                         else:
                             st.error("❌ Contraseña incorrecta.")
@@ -1542,8 +1938,7 @@ elif st.session_state.vista == "medico_login":
                         st.error("❌ Email no encontrado.")
             st.markdown('</div>', unsafe_allow_html=True)
         with tab_reset:
-            st.markdown('<div class="art-card">', unsafe_allow_html=True)
-            st.markdown("### Recuperar contraseña")
+            st.markdown('<div class="art-card"><h3 style="margin-top:0;">Recuperar contraseña</h3>', unsafe_allow_html=True)
             email_r = st.text_input("Tu email médico")
             if st.button("Enviar instrucciones", use_container_width=True):
                 medico = buscar_medico_por_email(email_r.strip().lower())

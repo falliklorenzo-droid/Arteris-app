@@ -142,12 +142,12 @@ section[data-testid="stSidebar"] { display: none; }
 .art-progress-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 8px; overflow: hidden; margin: 8px 0; }
 .art-progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1d4ed8, #06b6d4); }
 
-/* Day dots */
-.day-dots { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
-.day-dot { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
-.day-done { background: rgba(59,130,246,0.2); color: #3b82f6; }
-.day-today { background: #1d4ed8; color: white; }
-.day-pending { background: rgba(255,255,255,0.05); color: #475569; }
+/* Day pills */
+.day-dots { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+.day-dot { padding: 6px 14px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; border: 1px solid transparent; white-space: nowrap; }
+.day-done { background: rgba(16,185,129,0.15); color: #10b981; border-color: rgba(16,185,129,0.3); }
+.day-today { background: #1d4ed8; color: white; border-color: #3b82f6; }
+.day-pending { background: rgba(255,255,255,0.04); color: #64748b; border-color: rgba(255,255,255,0.06); }
 
 /* Typography */
 .section-eyebrow { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #3b82f6; margin-bottom: 8px; }
@@ -182,7 +182,7 @@ header { visibility: hidden; }
     .logo-tag { display: none; }
     .section-title { font-size: 26px; }
     .art-metric-num { font-size: 28px; }
-    .day-dot { width: 30px; height: 30px; font-size: 10px; }
+    .day-dot { padding: 5px 10px; font-size: 11px; }
 }
 @media (max-width: 480px) {
     .section-title { font-size: 22px; }
@@ -312,10 +312,10 @@ def crear_paciente(nombre, apellido, email, medico_id):
 
 def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_dia=None, atrasada=False):
     """Guarda una medición. Si fecha_dia se especifica, la toma se asigna a ese día
-    (formato YYYY-MM-DD) y se marca como atrasada."""
+    (formato YYYY-MM-DD) y se marca como atrasada. Si las columnas nuevas no existen
+    todavía en Supabase, intenta de nuevo sin ellas."""
     ahora = now_arg()
     if fecha_dia:
-        # Carga atrasada: usar la fecha del día específico + hora actual
         fecha_iso = f"{fecha_dia}T{ahora.strftime('%H:%M:%S')}-03:00"
         atrasada = True
     else:
@@ -331,7 +331,15 @@ def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_d
     }
     if pulso is not None:
         payload["pulso"] = pulso
-    get_sb().table("mediciones").insert(payload).execute()
+    try:
+        get_sb().table("mediciones").insert(payload).execute()
+    except Exception as ex:
+        # Fallback: re-intentar sin las columnas que podrían no existir aún
+        msg = str(ex)
+        for col in ("cargada_atrasada", "creada_at", "pulso"):
+            if col in msg and col in payload:
+                payload.pop(col, None)
+        get_sb().table("mediciones").insert(payload).execute()
     # Alerta automática por toma elevada
     if sistolica >= 180 or diastolica >= 110:
         generar_alerta(codigo, "toma_elevada",
@@ -423,27 +431,30 @@ def crear_session_medico(email):
         return None
 
 def validar_session(token):
-    """Devuelve (tipo, registro) si el token es válido y no expiró. Si no, (None, None)."""
+    """Devuelve (tipo, registro) si el token es válido y no expiró. Si no, (None, None).
+    Normaliza todo a UTC para evitar problemas de comparación con tz."""
     if not token:
         return None, None
     try:
-        r = get_sb().table("pacientes").select("*").eq("session_token", token).execute()
-        if r.data:
-            p = r.data[0]
-            exp = p.get("session_expires")
-            if exp and pd.to_datetime(exp) > pd.to_datetime(now_arg()):
-                return "paciente", p
+        now_utc = pd.to_datetime(now_arg(), utc=True)
     except Exception:
-        pass
-    try:
-        r = get_sb().table("medicos").select("*").eq("session_token", token).execute()
-        if r.data:
-            m = r.data[0]
-            exp = m.get("session_expires")
-            if exp and pd.to_datetime(exp) > pd.to_datetime(now_arg()):
-                return "medico", m
-    except Exception:
-        pass
+        now_utc = pd.Timestamp.utcnow()
+    for tabla in ("pacientes", "medicos"):
+        try:
+            r = get_sb().table(tabla).select("*").eq("session_token", token).execute()
+            if r.data:
+                u = r.data[0]
+                exp_raw = u.get("session_expires")
+                if exp_raw:
+                    try:
+                        exp_utc = pd.to_datetime(exp_raw, utc=True)
+                        if exp_utc > now_utc:
+                            return ("paciente" if tabla == "pacientes" else "medico"), u
+                    except Exception:
+                        # Si no podemos parsear la expiración, validamos por las dudas
+                        return ("paciente" if tabla == "pacientes" else "medico"), u
+        except Exception:
+            pass
     return None, None
 
 def invalidar_session(token):
@@ -1013,34 +1024,54 @@ if "reset_token" not in st.session_state:
     st.session_state.reset_token = params.get("reset", "")
 
 # ── Sesión persistente 30 días (cookie) ───────────────────────────────────────
-# extra_streamlit_components no está disponible en todos los entornos; degradamos a sesión efímera.
+# Usamos extra_streamlit_components con un singleton via session_state para que el
+# componente sobreviva los reruns y los cookies se persistan correctamente.
 try:
     import extra_streamlit_components as stx
-    cookie_manager = stx.CookieManager(key="arteris_cookie_mgr")
+    _STX_OK = True
 except Exception:
-    cookie_manager = None
+    _STX_OK = False
+
+def _get_cookie_manager():
+    if not _STX_OK:
+        return None
+    if "_cookie_manager" not in st.session_state:
+        try:
+            st.session_state._cookie_manager = stx.CookieManager(key="arteris_cookies_mgr")
+        except Exception:
+            st.session_state._cookie_manager = None
+    return st.session_state._cookie_manager
+
+cookie_manager = _get_cookie_manager()
 
 def set_session_cookie(token, expires):
-    if cookie_manager is None or not token:
+    mgr = _get_cookie_manager()
+    if mgr is None or not token:
         return
     try:
-        cookie_manager.set("arteris_session", token, expires_at=expires, key="set_arteris_cookie")
+        mgr.set("arteris_session", token, expires_at=expires, key=f"set_cookie_{token[:8]}")
     except Exception:
         pass
 
 def clear_session_cookie():
-    if cookie_manager is None:
+    mgr = _get_cookie_manager()
+    if mgr is None:
         return
     try:
-        cookie_manager.delete("arteris_session", key="del_arteris_cookie")
+        mgr.delete("arteris_session", key=f"del_cookie_{_secrets.token_hex(4)}")
     except Exception:
         pass
 
 def leer_session_cookie():
-    if cookie_manager is None:
+    mgr = _get_cookie_manager()
+    if mgr is None:
         return None
     try:
-        return cookie_manager.get("arteris_session")
+        # get_all() es más confiable que get(key) en algunos casos
+        all_cookies = mgr.get_all(key="get_all_cookies")
+        if all_cookies and "arteris_session" in all_cookies:
+            return all_cookies["arteris_session"]
+        return mgr.get("arteris_session")
     except Exception:
         return None
 
@@ -1654,20 +1685,16 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             </div>
             """, unsafe_allow_html=True)
 
-        dias_labels = ["D1", "D2", "D3", "D4", "D5", "D6", "D7"]
         dias_html = ""
-        for i, l in enumerate(dias_labels):
-            d_num = i + 1
+        for d_num in range(1, 8):
             n_tomas = len(tomas_de_dia(mediciones, d_num)) if mediciones else 0
             if n_tomas >= 4:
                 cls = "day-done"
             elif d_num == dia_actual:
                 cls = "day-today"
-            elif d_num < dia_actual and n_tomas < 4:
-                cls = "day-pending"  # día pasado incompleto
             else:
                 cls = "day-pending"
-            dias_html += f'<div class="day-dot {cls}">{l}</div>'
+            dias_html += f'<div class="day-dot {cls}">Día {d_num}</div>'
 
         pct = min(total / 28, 1.0)
         st.markdown(f"""
@@ -1681,59 +1708,66 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         </div>
         """, unsafe_allow_html=True)
 
-        # Aviso de tomas atrasadas
+        # Aviso de tomas atrasadas (con formulario inline por cada toma faltante)
         if faltantes:
             with st.expander(f"⚠️ Tenés tomas pendientes de días anteriores ({len(faltantes)} día{'s' if len(faltantes)>1 else ''})", expanded=False):
                 st.markdown('<p style="font-size:13px;color:#94a3b8;">Si te olvidaste de cargar pero tomaste la presión, podés agregar las tomas de días anteriores. Quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
                 for f in faltantes:
-                    tomas_faltantes = [t for t in tomas_orden if t not in f["momentos_cargados"]]
+                    tomas_faltantes_lista = [t for t in tomas_orden if t not in f["momentos_cargados"]]
                     st.markdown(f"**Día {f['dia']}** ({f['fecha'].strftime('%d/%m/%Y')}) — {f['tomas_cargadas']}/4 tomas cargadas.")
-                    for tt in tomas_faltantes:
+                    for tt in tomas_faltantes_lista:
+                        atr_key = f"{f['dia']}_{tt}"
                         cols_f = st.columns([3, 1])
                         with cols_f[0]:
                             momento_disp = tt.replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
                             st.caption(f"Falta: {momento_disp}")
                         with cols_f[1]:
-                            if st.button("Cargar", key=f"btn_atrasada_{f['dia']}_{tt}"):
-                                st.session_state[f"cargando_atrasada"] = {"dia": f["dia"], "fecha": f["fecha"].isoformat(), "momento": tt}
+                            if st.button("Cargar", key=f"btn_atrasada_{atr_key}", use_container_width=True):
+                                if st.session_state.get("atrasada_activa") == atr_key:
+                                    st.session_state.pop("atrasada_activa", None)
+                                else:
+                                    st.session_state["atrasada_activa"] = atr_key
+                                    st.session_state["atrasada_data"] = {"dia": f["dia"], "fecha": f["fecha"].isoformat(), "momento": tt}
                                 st.rerun()
+                        # Form inline justo debajo si esta toma es la seleccionada
+                        if st.session_state.get("atrasada_activa") == atr_key:
+                            st.markdown(
+                                '<div style="border-left:3px solid #f59e0b;padding:0.75rem 1rem;margin:0.5rem 0 1rem 0;background:rgba(245,158,11,0.06);border-radius:8px;">',
+                                unsafe_allow_html=True,
+                            )
+                            with st.form(f"form_atr_{atr_key}"):
+                                cf1, cf2, cf3 = st.columns(3)
+                                with cf1:
+                                    sis_a = st.number_input("Sistólica", min_value=60, max_value=250, value=120, step=1, key=f"sis_atr_{atr_key}")
+                                with cf2:
+                                    dia_a = st.number_input("Diastólica", min_value=40, max_value=150, value=80, step=1, key=f"dia_atr_{atr_key}")
+                                with cf3:
+                                    pulso_a = st.number_input("Pulso (lpm)", min_value=30, max_value=220, value=70, step=1, key=f"pul_atr_{atr_key}")
+                                confirmar_a = st.checkbox("Confirmo valores correctos (si son elevados)", key=f"conf_atr_{atr_key}")
+                                cb1, cb2 = st.columns(2)
+                                with cb1:
+                                    cancelar_a = st.form_submit_button("Cancelar", use_container_width=True)
+                                with cb2:
+                                    guardar_a = st.form_submit_button("Guardar", use_container_width=True, type="primary")
+                            if guardar_a:
+                                if (sis_a > 200 or dia_a > 120) and not confirmar_a:
+                                    st.warning(f"⚠️ Los valores {sis_a}/{dia_a} son muy elevados. Marcá la casilla de confirmación si son correctos.")
+                                else:
+                                    try:
+                                        guardar_medicion(codigo, sis_a, dia_a, tt, pulso=int(pulso_a),
+                                                         fecha_dia=f["fecha"].isoformat(), atrasada=True)
+                                        st.session_state.pop("atrasada_activa", None)
+                                        st.session_state.pop("atrasada_data", None)
+                                        st.success("✅ Toma atrasada guardada.")
+                                        st.rerun()
+                                    except Exception as ex:
+                                        st.error(f"No se pudo guardar la toma: {ex}")
+                            if cancelar_a:
+                                st.session_state.pop("atrasada_activa", None)
+                                st.session_state.pop("atrasada_data", None)
+                                st.rerun()
+                            st.markdown("</div>", unsafe_allow_html=True)
                     st.markdown("---")
-
-        seccion_pasos()
-
-        st.markdown("---")
-
-        # Formulario de carga atrasada si está pendiente
-        if st.session_state.get("cargando_atrasada"):
-            ca = st.session_state["cargando_atrasada"]
-            momento_disp = ca["momento"].replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
-            st.warning(f"📝 Cargando toma atrasada — **Día {ca['dia']}** ({pd.to_datetime(ca['fecha']).date().strftime('%d/%m/%Y')}) · {momento_disp}")
-            with st.form("form_atrasada"):
-                cf1, cf2, cf3 = st.columns(3)
-                with cf1:
-                    sis_a = st.number_input("Sistólica", min_value=60, max_value=250, value=120, step=1, key="sis_atr")
-                with cf2:
-                    dia_a = st.number_input("Diastólica", min_value=40, max_value=150, value=80, step=1, key="dia_atr")
-                with cf3:
-                    pulso_a = st.number_input("Pulso (lpm)", min_value=30, max_value=220, value=70, step=1, key="pul_atr")
-                confirmar_a = st.checkbox("Confirmo valores correctos (si son elevados)")
-                c_btn1, c_btn2 = st.columns(2)
-                with c_btn1:
-                    guardar_a = st.form_submit_button("Guardar toma atrasada", use_container_width=True)
-                with c_btn2:
-                    cancelar_a = st.form_submit_button("Cancelar", use_container_width=True)
-            if guardar_a:
-                if (sis_a > 200 or dia_a > 120) and not confirmar_a:
-                    st.warning(f"⚠️ Los valores {sis_a}/{dia_a} son muy elevados. Marcá la casilla de confirmación si son correctos.")
-                else:
-                    guardar_medicion(codigo, sis_a, dia_a, ca["momento"], pulso=int(pulso_a),
-                                     fecha_dia=pd.to_datetime(ca["fecha"]).date().isoformat(), atrasada=True)
-                    del st.session_state["cargando_atrasada"]
-                    st.success("✅ Toma atrasada guardada.")
-                    st.rerun()
-            if cancelar_a:
-                del st.session_state["cargando_atrasada"]
-                st.rerun()
 
         if total >= 28:
             resultado = calcular_resultado(mediciones)
@@ -1890,6 +1924,10 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             eventos_p = obtener_eventos_adversos(codigo)
             for ev in eventos_p:
                 st.markdown(f'<div style="background:rgba(255,255,255,0.03);border-left:3px solid #dc2626;padding:8px 12px;margin-bottom:8px;border-radius:4px;font-size:13px;color:#94a3b8;">{ev.get("descripcion","")}<br><span style="font-size:11px;color:#475569;">{str(ev.get("fecha",""))[:10]}</span></div>', unsafe_allow_html=True)
+
+        # Pasos a seguir como referencia (al final, plegado por defecto)
+        with st.expander("📖 Cómo medir bien tu presión (pasos a seguir)"):
+            seccion_pasos()
 
     footer()
 

@@ -881,14 +881,14 @@ def calcular_resultado(mediciones):
     if df.empty:
         return None
 
-    # Últimos 6 días: tomamos los últimos 6 días con tomas (descartando el primero del protocolo)
+    # Últimos 6 días: los 6 días más recientes con tomas, descartando los más viejos.
     dias_ordenados = sorted(df["fecha_local"].unique())
     if len(dias_ordenados) >= 7:
-        dias_para_promedio = dias_ordenados[1:7]  # descarta día 1, usa días 2-7
+        dias_para_promedio = dias_ordenados[-6:]  # los últimos 6 días
     elif len(dias_ordenados) >= 2:
-        dias_para_promedio = dias_ordenados[1:]   # descarta día 1, usa los que haya
+        dias_para_promedio = dias_ordenados[1:]   # descartamos el día 1, usamos lo que haya
     else:
-        dias_para_promedio = dias_ordenados        # único día, no se puede descartar
+        dias_para_promedio = dias_ordenados        # único día
 
     df_promedio = df[df["fecha_local"].isin(dias_para_promedio)]
     total_tomas_seguimiento = len(df)  # total cargadas en todo el protocolo
@@ -1298,9 +1298,17 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
         pdf.ln(1)
         titulo_limpio = "".join(c for c in resultado.get("titulo", "") if ord(c) < 256).strip()
         pdf.set_font("Helvetica", "B", 10)
-        pdf.multi_cell(0, 6, t(titulo_limpio))
+        pdf.set_x(pdf.l_margin)
+        try:
+            pdf.multi_cell(180, 6, t(titulo_limpio))
+        except Exception:
+            pdf.cell(180, 6, t(titulo_limpio), 0, 1)
         pdf.set_font("Helvetica", "", 9)
-        pdf.multi_cell(0, 5, t(resultado.get("mensaje", "")))
+        pdf.set_x(pdf.l_margin)
+        try:
+            pdf.multi_cell(180, 5, t(resultado.get("mensaje", "")))
+        except Exception:
+            pdf.cell(180, 5, t(resultado.get("mensaje", "")[:200]), 0, 1)
     else:
         pdf.cell(0, 6, t("Monitoreo incompleto: faltan registros para calcular el resultado."), 0, 1)
     pdf.ln(3)
@@ -1352,7 +1360,11 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
     pdf.set_font("Helvetica", "", 9)
     if eventos:
         for ev in eventos:
-            pdf.multi_cell(0, 5, t(f"- [{str(ev.get('fecha',''))[:10]}] {ev.get('descripcion','')}"))
+            pdf.set_x(pdf.l_margin)
+            try:
+                pdf.multi_cell(180, 5, t(f"- [{str(ev.get('fecha',''))[:10]}] {ev.get('descripcion','')}"))
+            except Exception:
+                pdf.cell(180, 5, t(f"- [{str(ev.get('fecha',''))[:10]}] {str(ev.get('descripcion',''))[:100]}"), 0, 1)
     else:
         pdf.cell(0, 6, t("Sin eventos reportados."), 0, 1)
     pdf.ln(2)
@@ -1363,7 +1375,11 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
     pdf.set_font("Helvetica", "", 9)
     if alertas:
         for al in alertas:
-            pdf.multi_cell(0, 5, t(f"- [{str(al.get('fecha',''))[:10]}] {al.get('mensaje','')}"))
+            pdf.set_x(pdf.l_margin)
+            try:
+                pdf.multi_cell(180, 5, t(f"- [{str(al.get('fecha',''))[:10]}] {al.get('mensaje','')}"))
+            except Exception:
+                pdf.cell(180, 5, t(f"- [{str(al.get('fecha',''))[:10]}] {str(al.get('mensaje',''))[:100]}"), 0, 1)
     else:
         pdf.cell(0, 6, t("Sin alertas generadas."), 0, 1)
     pdf.ln(4)
@@ -1371,10 +1387,14 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
     # Pie / descargo
     pdf.set_font("Helvetica", "I", 7)
     pdf.set_text_color(120, 120, 120)
-    pdf.multi_cell(0, 4, t(
-        "Informe orientativo generado por la plataforma Arteris. No constituye un diagnóstico médico "
-        "y no reemplaza la consulta con un profesional de la salud. Datos tratados conforme a la "
-        "Ley 25.326 de Protección de Datos Personales."))
+    pdf.set_x(pdf.l_margin)
+    try:
+        pdf.multi_cell(180, 4, t(
+            "Informe orientativo generado por la plataforma Arteris. No constituye un diagnóstico médico "
+            "y no reemplaza la consulta con un profesional de la salud. Datos tratados conforme a la "
+            "Ley 25.326 de Protección de Datos Personales."))
+    except Exception:
+        pass
 
     out = pdf.output()
     if isinstance(out, (bytes, bytearray)):
@@ -2357,15 +2377,29 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     f'</div>',
                     unsafe_allow_html=True)
 
-                # Aviso si ya se envió el PDF por mail
-                if paciente.get("ultimo_pdf_enviado_at"):
-                    st.info("📧 El informe en PDF se envió automáticamente a tu email cuando completaste el monitoreo.")
-
-                # Exportar PDF
+                # Exportar PDF + envío diferido por mail si todavía no se envió
                 eventos = obtener_eventos_adversos(codigo)
                 alertas = obtener_alertas(codigo)
+                pdf_bytes = None
                 try:
                     pdf_bytes = generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas)
+                except Exception:
+                    pdf_bytes = None
+
+                # Si no llegó a enviarse el PDF en su momento, lo enviamos ahora
+                if pdf_bytes and not paciente.get("ultimo_pdf_enviado_at") and paciente.get("email"):
+                    try:
+                        if enviar_pdf_informe(paciente.get("email"), paciente.get("nombre", ""), pdf_bytes):
+                            actualizar_paciente(codigo, {"ultimo_pdf_enviado_at": now_arg().isoformat()})
+                            st.session_state.paciente_data = buscar_paciente(codigo)
+                            paciente = st.session_state.paciente_data
+                    except Exception:
+                        pass
+
+                if paciente.get("ultimo_pdf_enviado_at"):
+                    st.info("📧 El informe en PDF se envió a tu email. Revisalo y guardalo. También podés descargarlo abajo.")
+
+                if pdf_bytes:
                     st.download_button(
                         "📄 Descargar informe HBPM en PDF",
                         data=pdf_bytes,
@@ -2373,8 +2407,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                         mime="application/pdf",
                         use_container_width=True
                     )
-                except Exception as e:
-                    st.warning(f"No se pudo generar el PDF: {e}")
 
                 # Botón de reiniciar procedimiento (con confirmación)
                 st.markdown("---")

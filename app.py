@@ -383,15 +383,26 @@ def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_d
     if pulso is not None and pulso >= 110:
         generar_alerta(codigo, "pulso_elevado",
                        f"Frecuencia cardíaca elevada: {pulso} bpm ({momento}).")
-    # Alerta automática al completar el monitoreo
+    # Alerta automática + envío de PDF al completar el monitoreo
     try:
         meds = obtener_mediciones(codigo)
-        if len(meds) == 28:
+        if len(meds) >= 28:
             res = calcular_resultado(meds)
-            if res and res["categoria"] != "controlada":
+            if res and res.get("categoria") not in ("controlada", "insuficiente"):
                 generar_alerta(codigo, "resultado",
-                               f"Resultado del HBPM: {res['titulo']} "
-                               f"({res['sis_general']}/{res['dia_general']} mmHg promedio).")
+                               f"Resultado del HBPM: {res.get('titulo','')} "
+                               f"({res.get('sis_general','-')}/{res.get('dia_general','-')} mmHg promedio).")
+            # Envío automático del PDF (una sola vez por procedimiento)
+            try:
+                p = buscar_paciente(codigo)
+                if p and not p.get("ultimo_pdf_enviado_at") and p.get("email"):
+                    eventos = obtener_eventos_adversos(codigo)
+                    alertas = obtener_alertas(codigo)
+                    pdf_bytes = generar_pdf_hbpm(p, meds, res, eventos, alertas)
+                    if enviar_pdf_informe(p.get("email"), p.get("nombre", ""), pdf_bytes):
+                        actualizar_paciente(codigo, {"ultimo_pdf_enviado_at": now_arg().isoformat()})
+            except Exception as e:
+                print(f"Error envío PDF automático: {e}")
     except Exception:
         pass
 
@@ -659,6 +670,94 @@ def enviar_activacion_medico(nombre, email):
         st.error(f"Error al enviar el email: {e}")
         return False
 
+def enviar_pdf_informe(email, nombre, pdf_bytes):
+    """Envía el PDF del informe HBPM adjunto al paciente cuando completa el monitoreo."""
+    try:
+        import base64
+        resend.api_key = get_secret("resend", "api_key")
+        resend.Emails.send({
+            "from": "Arteris <noreply@arterismed.com>",
+            "to": email,
+            "subject": "Tu informe de Monitoreo Domiciliario de Presión Arterial · Arteris",
+            "html": f"""
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a1628;color:#e8eef7;border-radius:12px;overflow:hidden;">
+              <div style="background:#1d4ed8;padding:24px 32px;">
+                <h1 style="font-size:24px;margin:0;color:white;font-weight:400;">Arteris</h1>
+                <p style="font-size:12px;color:rgba(255,255,255,0.7);margin:4px 0 0;letter-spacing:1px;text-transform:uppercase;">Monitoreo Domiciliario de Presión Arterial</p>
+              </div>
+              <div style="padding:32px;">
+                <p style="font-size:16px;">Hola{(' ' + nombre) if nombre else ''},</p>
+                <p style="color:#94a3b8;line-height:1.6;">Completaste tu monitoreo domiciliario de presión arterial. Te adjuntamos el informe HBPM en PDF — guardalo y compartilo con tu médico tratante.</p>
+                <p style="font-size:11px;color:#64748b;margin-top:20px;">Este informe es orientativo y no reemplaza una consulta médica.</p>
+              </div>
+            </div>""",
+            "attachments": [
+                {
+                    "filename": "Informe_HBPM_Arteris.pdf",
+                    "content": list(pdf_bytes) if isinstance(pdf_bytes, (bytes, bytearray)) else pdf_bytes,
+                }
+            ],
+        })
+        return True
+    except Exception as e:
+        print(f"Error enviando PDF: {e}")
+        return False
+
+def archivar_procedimiento(codigo, paciente_data, mediciones, resultado, eventos, alertas):
+    """Guarda una copia del procedimiento actual en historial_procedimientos."""
+    try:
+        df_meds = pd.DataFrame(mediciones) if mediciones else pd.DataFrame()
+        if not df_meds.empty and "fecha" in df_meds.columns:
+            df_meds["fecha_local"] = df_meds["fecha"].apply(parse_fecha_local)
+            fechas = [f for f in df_meds["fecha_local"].tolist() if f is not None]
+            fecha_inicio_iso = min(fechas).isoformat() if fechas else None
+        else:
+            fecha_inicio_iso = None
+        get_sb().table("historial_procedimientos").insert({
+            "codigo_paciente": codigo,
+            "fecha_inicio": fecha_inicio_iso,
+            "fecha_fin": now_arg().isoformat(),
+            "resultado": resultado,
+            "mediciones": mediciones,
+            "eventos": eventos,
+            "alertas": alertas,
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"Error archivando procedimiento: {e}")
+        return False
+
+def obtener_historial_paciente(codigo):
+    """Lista de procedimientos completados para un paciente, más reciente primero."""
+    try:
+        r = get_sb().table("historial_procedimientos").select("*")\
+            .eq("codigo_paciente", codigo)\
+            .order("fecha_fin", desc=True).execute()
+        return r.data or []
+    except Exception:
+        return []
+
+def reiniciar_procedimiento_paciente(codigo):
+    """Borra las mediciones, eventos y alertas del procedimiento actual.
+    Asume que ya se archivó en historial. Conserva el paciente y su medicación."""
+    sb = get_sb()
+    try:
+        sb.table("mediciones").delete().eq("codigo_paciente", codigo).execute()
+    except Exception:
+        pass
+    try:
+        sb.table("eventos_adversos").delete().eq("codigo_paciente", codigo).execute()
+    except Exception:
+        pass
+    try:
+        sb.table("alertas").delete().eq("codigo_paciente", codigo).execute()
+    except Exception:
+        pass
+    try:
+        sb.table("pacientes").update({"ultimo_pdf_enviado_at": None}).eq("codigo", codigo).execute()
+    except Exception:
+        pass
+
 def enviar_reset_password(email, link, nombre=""):
     try:
         resend.api_key = get_secret("resend", "api_key")
@@ -688,13 +787,28 @@ def enviar_reset_password(email, link, nombre=""):
         return False
 
 # ── Lógica médica ─────────────────────────────────────────────────────────────
+def parse_fecha_local(val):
+    """Convierte una fecha (cualquiera sea su tz) a la fecha local de Argentina."""
+    if not val:
+        return None
+    try:
+        dt = pd.to_datetime(val, format="mixed", errors="coerce", utc=True)
+        if pd.isna(dt):
+            return None
+        return dt.tz_convert(ARG_TZ).date()
+    except Exception:
+        try:
+            return pd.to_datetime(val, errors="coerce").date()
+        except Exception:
+            return None
+
 def fecha_inicio_protocolo(mediciones):
     """Devuelve la fecha del día 1 del protocolo (fecha de la primera medición).
     Si no hay mediciones aún, devuelve la fecha de hoy en Argentina."""
     if not mediciones:
         return hoy_arg()
-    fechas = [pd.to_datetime(m["fecha"], format="mixed", errors="coerce").date() for m in mediciones if m.get("fecha")]
-    fechas = [f for f in fechas if pd.notna(f)]
+    fechas = [parse_fecha_local(m.get("fecha")) for m in mediciones]
+    fechas = [f for f in fechas if f is not None]
     return min(fechas) if fechas else hoy_arg()
 
 def dia_protocolo_actual(mediciones):
@@ -715,11 +829,9 @@ def tomas_de_dia(mediciones, dia_num):
     fecha_dia = fecha_de_dia(mediciones, dia_num)
     out = []
     for m in mediciones:
-        try:
-            if pd.to_datetime(m["fecha"], format="mixed", errors="coerce").date() == fecha_dia:
-                out.append(m)
-        except Exception:
-            pass
+        f = parse_fecha_local(m.get("fecha"))
+        if f == fecha_dia:
+            out.append(m)
     return out
 
 def dias_con_faltantes(mediciones, hasta_dia=None):
@@ -755,52 +867,113 @@ def puede_editar(medicion):
         return False
 
 def calcular_resultado(mediciones):
-    """Calcula promedios y categoría del HBPM. Requiere las 28 tomas (7 días x 4).
-    Descarta el día 1 y usa los días 2 a 7. Devuelve un dict o None."""
-    if not mediciones or len(mediciones) < 28:
+    """Calcula promedios y categoría del HBPM según el algoritmo clínico actualizado:
+    - Toma los últimos 6 días (descarta el día 1 según protocolo HBPM).
+    - Si esos 6 días tienen las 24 tomas (ideal) o al menos 12 tomas (mínimo aceptable),
+      calcula el resultado.
+    - Si tienen menos de 12 → resultado "insuficiente" (no útil clínicamente).
+    - Reporta % de adherencia sobre 28 (base 100%)."""
+    if not mediciones:
         return None
     df = pd.DataFrame(mediciones)
-    df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
-    df["dia"] = df["fecha_dt"].dt.date
-    dias = sorted(df["dia"].unique())
-    if len(dias) >= 7:
-        dias_validos = dias[1:7]
-    elif len(dias) > 1:
-        dias_validos = dias[1:]
-    else:
-        dias_validos = dias
-    df = df[df["dia"].isin(dias_validos)]
+    df["fecha_local"] = df["fecha"].apply(parse_fecha_local)
+    df = df.dropna(subset=["fecha_local"])
     if df.empty:
         return None
 
-    df["periodo"] = df["momento"].fillna("").apply(
+    # Últimos 6 días: tomamos los últimos 6 días con tomas (descartando el primero del protocolo)
+    dias_ordenados = sorted(df["fecha_local"].unique())
+    if len(dias_ordenados) >= 7:
+        dias_para_promedio = dias_ordenados[1:7]  # descarta día 1, usa días 2-7
+    elif len(dias_ordenados) >= 2:
+        dias_para_promedio = dias_ordenados[1:]   # descarta día 1, usa los que haya
+    else:
+        dias_para_promedio = dias_ordenados        # único día, no se puede descartar
+
+    df_promedio = df[df["fecha_local"].isin(dias_para_promedio)]
+    total_tomas_seguimiento = len(df)  # total cargadas en todo el protocolo
+    tomas_ult6 = len(df_promedio)
+    adherencia_pct = round(min(total_tomas_seguimiento / 28 * 100, 100), 1)
+
+    # Categoría de calidad del informe
+    if tomas_ult6 >= 24:
+        calidad = "ideal"
+        calidad_msg = f"Informe ideal: {tomas_ult6}/24 tomas en los últimos 6 días."
+    elif tomas_ult6 >= 12:
+        calidad = "util"
+        calidad_msg = f"Informe útil pero incompleto: {tomas_ult6} tomas en los últimos 6 días (mínimo recomendado: 12)."
+    else:
+        calidad = "insuficiente"
+        calidad_msg = (
+            f"Informe insuficiente: solo {tomas_ult6} tomas en los últimos 6 días. "
+            "Según los estándares actuales (mínimo 12 tomas en 6 días) no es posible "
+            "dar un informe clínicamente útil."
+        )
+
+    if df_promedio.empty:
+        return {
+            "calidad": "insuficiente",
+            "calidad_msg": calidad_msg,
+            "adherencia_pct": adherencia_pct,
+            "total_tomas_seguimiento": total_tomas_seguimiento,
+            "tomas_ult6": tomas_ult6,
+            "tipo": "warning",
+            "titulo": "⚠️ Informe insuficiente",
+            "mensaje": calidad_msg,
+            "categoria": "insuficiente",
+            "dias_usados": 0,
+            "sis_manana": None, "dia_manana": None,
+            "sis_tarde": None, "dia_tarde": None,
+            "sis_general": None, "dia_general": None,
+            "pulso_general": None,
+            "promedios_diarios": [],
+        }
+
+    df_promedio = df_promedio.copy()
+    df_promedio["periodo"] = df_promedio["momento"].fillna("").apply(
         lambda m: "mañana" if str(m).startswith("mañana")
         else ("tarde" if str(m).startswith("tarde") else "otro"))
-    manana = df[df["periodo"] == "mañana"]
-    tarde = df[df["periodo"] == "tarde"]
+    manana = df_promedio[df_promedio["periodo"] == "mañana"]
+    tarde = df_promedio[df_promedio["periodo"] == "tarde"]
 
-    df["pulso_num"] = pd.to_numeric(df.get("pulso"), errors="coerce") if "pulso" in df.columns else None
     pulso_general = None
-    if "pulso_num" in df.columns and df["pulso_num"].notna().any():
-        pulso_general = round(df["pulso_num"].mean(), 1)
+    if "pulso" in df_promedio.columns:
+        pulso_num = pd.to_numeric(df_promedio["pulso"], errors="coerce")
+        if pulso_num.notna().any():
+            pulso_general = round(float(pulso_num.mean()), 1)
 
     res = {
         "sis_manana": round(manana["sistolica"].mean(), 1) if not manana.empty else None,
         "dia_manana": round(manana["diastolica"].mean(), 1) if not manana.empty else None,
         "sis_tarde": round(tarde["sistolica"].mean(), 1) if not tarde.empty else None,
         "dia_tarde": round(tarde["diastolica"].mean(), 1) if not tarde.empty else None,
-        "sis_general": round(df["sistolica"].mean(), 1),
-        "dia_general": round(df["diastolica"].mean(), 1),
+        "sis_general": round(df_promedio["sistolica"].mean(), 1),
+        "dia_general": round(df_promedio["diastolica"].mean(), 1),
         "pulso_general": pulso_general,
-        "dias_usados": len(dias_validos),
+        "dias_usados": len(dias_para_promedio),
+        "tomas_ult6": tomas_ult6,
+        "total_tomas_seguimiento": total_tomas_seguimiento,
+        "adherencia_pct": adherencia_pct,
+        "calidad": calidad,
+        "calidad_msg": calidad_msg,
     }
 
-    diarios = df.groupby("dia").agg(
+    diarios = df_promedio.groupby("fecha_local").agg(
         sis_m=("sistolica", "mean"), dia_m=("diastolica", "mean")).reset_index()
     res["promedios_diarios"] = [
-        {"fecha": str(r["dia"]), "sis": round(r["sis_m"], 1), "dia": round(r["dia_m"], 1)}
+        {"fecha": str(r["fecha_local"]), "sis": round(r["sis_m"], 1), "dia": round(r["dia_m"], 1)}
         for _, r in diarios.iterrows()
     ]
+
+    # Si la calidad es insuficiente, devolvemos info pero con categoría especial
+    if calidad == "insuficiente":
+        res.update({
+            "categoria": "insuficiente",
+            "titulo": "⚠️ Informe insuficiente",
+            "mensaje": calidad_msg,
+            "tipo": "warning",
+        })
+        return res
 
     s, d = res["sis_general"], res["dia_general"]
     if s >= 180 or d >= 110:
@@ -856,15 +1029,28 @@ def grafico_evolucion(mediciones):
 
 
 def generar_conclusion(resultado, mediciones):
-    """Genera una mini-conclusión clínica orientativa basada en presión y pulso.
+    """Genera una mini-conclusión clínica orientativa basada en presión, pulso y adherencia.
     NO es diagnóstico: es un resumen orientativo para que médico y paciente lo vean rápido."""
     if not resultado:
         return "Sin datos suficientes para una conclusión."
+    categoria = resultado.get("categoria", "")
+    calidad = resultado.get("calidad", "")
+    adherencia = resultado.get("adherencia_pct")
+    total_seg = resultado.get("total_tomas_seguimiento", 0)
+    tomas_ult6 = resultado.get("tomas_ult6", 0)
+    partes = []
+
+    # Caso insuficiente: el informe no es clínicamente útil
+    if categoria == "insuficiente" or calidad == "insuficiente":
+        partes.append(f"<strong>Informe insuficiente.</strong> Solo {tomas_ult6} tomas en los últimos 6 días (mínimo recomendado: 12). Según los estándares actuales no es posible elaborar un informe clínico útil.")
+        if adherencia is not None:
+            partes.append(f"Adherencia al protocolo: {adherencia}% ({total_seg}/28 tomas).")
+        return " ".join(partes) + " <em style='color:#94a3b8;'>(Conclusión orientativa, no constituye diagnóstico médico.)</em>"
+
     s = resultado.get("sis_general")
     d = resultado.get("dia_general")
     p = resultado.get("pulso_general")
-    categoria = resultado.get("categoria", "")
-    partes = []
+
     # Resumen de PA
     if categoria == "urgente":
         partes.append(f"<strong>Presión arterial muy elevada</strong> (promedio {s}/{d} mmHg). Se sugiere atención médica urgente.")
@@ -874,12 +1060,20 @@ def generar_conclusion(resultado, mediciones):
         partes.append(f"<strong>Presión arterial controlada</strong> (promedio {s}/{d} mmHg).")
     elif categoria == "no_controlada":
         partes.append(f"<strong>Presión arterial no controlada</strong> (promedio {s}/{d} mmHg). Se sugiere consulta médica.")
+
+    # Calidad del informe
+    if calidad == "util":
+        partes.append(f"Informe útil pero parcial: {tomas_ult6} tomas en los últimos 6 días (ideal: 24).")
+    elif calidad == "ideal":
+        partes.append(f"Registro completo de los últimos 6 días ({tomas_ult6}/24).")
+
     # Variabilidad mañana/tarde
-    sm, dm = resultado.get("sis_manana"), resultado.get("dia_manana")
-    st_, dt_ = resultado.get("sis_tarde"), resultado.get("dia_tarde")
+    sm = resultado.get("sis_manana")
+    st_ = resultado.get("sis_tarde")
     if sm and st_ and abs(sm - st_) >= 15:
         cual = "mayor por la mañana" if sm > st_ else "mayor por la tarde"
         partes.append(f"Variabilidad notable entre mañana y tarde ({cual}).")
+
     # Pulso
     if p is not None:
         if p >= 100:
@@ -888,13 +1082,17 @@ def generar_conclusion(resultado, mediciones):
             partes.append(f"Frecuencia cardíaca promedio baja ({p} bpm): podría ser bradicardia, evaluar contexto clínico.")
         else:
             partes.append(f"Frecuencia cardíaca promedio en rango normal ({p} bpm).")
+
     # Adherencia
+    if adherencia is not None:
+        partes.append(f"Adherencia al protocolo: {adherencia}% ({total_seg}/28 tomas).")
     try:
         atrasadas = sum(1 for m in mediciones if m.get("cargada_atrasada"))
         if atrasadas:
-            partes.append(f"{atrasadas} toma(s) cargada(s) con atraso (revisar adherencia del registro).")
+            partes.append(f"{atrasadas} toma(s) cargada(s) con atraso.")
     except Exception:
         pass
+
     return " ".join(partes) + " <em style='color:#94a3b8;'>(Conclusión orientativa, no constituye diagnóstico médico.)</em>"
 
 
@@ -1134,11 +1332,18 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
         pdf.set_font("Helvetica", "B", 11)
         pdf.cell(0, 7, t("Conclusión orientativa"), ln=1)
         pdf.set_font("Helvetica", "", 9)
-        # Sacar el HTML de la conclusión: usar versión plana
         conclusion_plana = generar_conclusion(resultado, mediciones)
         import re as _re
         conclusion_plana = _re.sub(r"<[^>]+>", "", conclusion_plana).strip()
-        pdf.multi_cell(0, 5, t(conclusion_plana))
+        try:
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(180, 5, t(conclusion_plana))
+        except Exception:
+            # Si falla por cualquier motivo, intentamos un fallback simple
+            try:
+                pdf.cell(0, 5, t(conclusion_plana[:200] + "..."), ln=1)
+            except Exception:
+                pass
         pdf.ln(3)
 
     # Eventos adversos
@@ -1211,40 +1416,47 @@ if "reset_token" not in st.session_state:
     st.session_state.reset_token = params.get("reset", "")
 
 # ── Sesión persistente 30 días (cookie) ───────────────────────────────────────
-# Patrón recomendado por extra_streamlit_components: instanciar sin caching y usar
-# el mismo key fijo para que el componente persista entre reruns.
+# Usamos streamlit_cookies_controller, mucho más confiable que extra_streamlit_components.
 try:
-    import extra_streamlit_components as stx
-    cookie_manager = stx.CookieManager()
+    from streamlit_cookies_controller import CookieController
+    cookie_controller = CookieController()
 except Exception:
-    cookie_manager = None
+    cookie_controller = None
 
 def set_session_cookie(token, expires):
-    if cookie_manager is None or not token:
+    if cookie_controller is None or not token:
         return
     try:
-        cookie_manager.set("arteris_session", token, expires_at=expires)
+        # max_age en segundos (30 días)
+        max_age = int((expires - now_arg()).total_seconds())
+        cookie_controller.set("arteris_session", token, max_age=max_age, path="/", same_site="lax")
     except Exception:
-        pass
+        try:
+            cookie_controller.set("arteris_session", token)
+        except Exception:
+            pass
 
 def clear_session_cookie():
-    if cookie_manager is None:
+    if cookie_controller is None:
         return
     try:
-        cookie_manager.delete("arteris_session")
+        cookie_controller.remove("arteris_session", path="/")
     except Exception:
-        pass
+        try:
+            cookie_controller.remove("arteris_session")
+        except Exception:
+            pass
 
 def leer_session_cookie():
-    if cookie_manager is None:
+    if cookie_controller is None:
         return None
     try:
-        all_cookies = cookie_manager.get_all()
-        if all_cookies and "arteris_session" in all_cookies:
-            return all_cookies["arteris_session"]
-        return cookie_manager.get("arteris_session")
+        return cookie_controller.get("arteris_session")
     except Exception:
         return None
+
+# Compatibility shim: el código viejo usa "cookie_manager"; lo aliasamos.
+cookie_manager = cookie_controller
 
 def iniciar_sesion_persistente(tipo, ident):
     """Crea un token de sesión en DB y lo guarda en cookie (30 días)."""
@@ -1536,6 +1748,9 @@ elif st.session_state.vista == "paciente_ajustes":
             if st.button("🏠 Inicio", use_container_width=True, key="pop_inicio"):
                 st.session_state.vista = "paciente_home"
                 st.rerun()
+            if st.button("📚 Historial", use_container_width=True, key="pop_ajustes_historial"):
+                st.session_state.vista = "paciente_historial"
+                st.rerun()
             if st.button("🚪 Cerrar sesión", use_container_width=True, key="pop_cerrar"):
                 cerrar_sesion()
 
@@ -1670,6 +1885,78 @@ elif st.session_state.vista == "paciente_ajustes":
     footer()
 
 # ══════════════════════════════════════════════════════════════════════════════
+# VISTA: HISTORIAL DE PROCEDIMIENTOS DEL PACIENTE
+# ══════════════════════════════════════════════════════════════════════════════
+elif st.session_state.vista == "paciente_historial":
+    paciente = st.session_state.paciente_data
+    if not paciente:
+        st.session_state.vista = "paciente_login"
+        st.rerun()
+    nombre = paciente.get("nombre", "Paciente")
+    navbar(f"Historial · {nombre}")
+
+    col_h1, col_h2, col_h3 = st.columns([2, 4, 1])
+    with col_h1:
+        if st.button("← Volver al inicio", key="hist_volver_top"):
+            st.session_state.vista = "paciente_home"
+            st.rerun()
+    with col_h3:
+        with st.popover("⚙️ " + nombre[:10]):
+            if st.button("🏠 Inicio", use_container_width=True, key="pop_hist_inicio"):
+                st.session_state.vista = "paciente_home"
+                st.rerun()
+            if st.button("⚙️ Ajustes", use_container_width=True, key="pop_hist_ajustes"):
+                st.session_state.vista = "paciente_ajustes"
+                st.rerun()
+            if st.button("🚪 Cerrar sesión", use_container_width=True, key="pop_hist_cerrar"):
+                cerrar_sesion()
+
+    st.markdown("### 📚 Historial de monitoreos completados")
+    st.markdown('<p style="font-size:13px;color:#94a3b8;margin-bottom:1rem;">Acá vas a encontrar los procedimientos de HBPM que ya completaste, ordenados del más reciente al más antiguo.</p>', unsafe_allow_html=True)
+
+    historial = obtener_historial_paciente(paciente["codigo"])
+    if not historial:
+        st.info("Todavía no tenés procedimientos completados archivados. El procedimiento actual va a archivarse acá cuando lo reinicies.")
+    else:
+        for h in historial:
+            fecha_ini = str(h.get("fecha_inicio", ""))[:10] or "—"
+            fecha_fin = str(h.get("fecha_fin", ""))[:10] or "—"
+            res = h.get("resultado") or {}
+            titulo = res.get("titulo", "—")
+            adh = res.get("adherencia_pct")
+            adh_str = f" · Adherencia {adh}%" if adh is not None else ""
+            with st.expander(f"📋 {fecha_ini} → {fecha_fin} · {titulo}{adh_str}", expanded=False):
+                cA, cB, cC, cD = st.columns(4)
+                with cA:
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:20px;">{res.get("sis_manana","—")}/{res.get("dia_manana","—")}</div><div class="art-metric-label">Prom. mañana</div></div>', unsafe_allow_html=True)
+                with cB:
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:20px;">{res.get("sis_tarde","—")}/{res.get("dia_tarde","—")}</div><div class="art-metric-label">Prom. tarde</div></div>', unsafe_allow_html=True)
+                with cC:
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:20px;">{res.get("sis_general","—")}/{res.get("dia_general","—")}</div><div class="art-metric-label">Prom. general</div></div>', unsafe_allow_html=True)
+                with cD:
+                    pulso_h = res.get("pulso_general")
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:20px;">{pulso_h or "—"}{" bpm" if pulso_h else ""}</div><div class="art-metric-label">Pulso prom.</div></div>', unsafe_allow_html=True)
+                if res.get("mensaje"):
+                    st.caption(res["mensaje"])
+                if res.get("calidad_msg"):
+                    st.caption(res["calidad_msg"])
+                # Botón de descarga del PDF reconstruido
+                try:
+                    pdf_bytes = generar_pdf_hbpm(paciente, h.get("mediciones") or [], res, h.get("eventos") or [], h.get("alertas") or [])
+                    st.download_button(
+                        "📄 Descargar informe HBPM en PDF",
+                        data=pdf_bytes,
+                        file_name=f"HBPM_{paciente.get('apellido','')}_{fecha_fin}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key=f"dl_hist_{h.get('id','')}",
+                    )
+                except Exception as ex:
+                    st.warning(f"No se pudo regenerar el PDF de este informe: {ex}")
+
+    footer()
+
+# ══════════════════════════════════════════════════════════════════════════════
 # VISTA: LOGIN PACIENTE
 # ══════════════════════════════════════════════════════════════════════════════
 elif st.session_state.vista == "paciente_login":
@@ -1777,10 +2064,13 @@ elif st.session_state.vista == "paciente_home":
         with st.popover("⚙️ " + nombre[:10]):
             st.markdown(f'<p style="font-size:13px;color:#94a3b8;margin-bottom:8px;">Sesión activa como<br><strong style="color:#e8eef7;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
             st.divider()
-            if st.button("⚙️ Ajustes", use_container_width=True):
+            if st.button("⚙️ Ajustes", use_container_width=True, key="pop_home_ajustes"):
                 st.session_state.vista = "paciente_ajustes"
                 st.rerun()
-            if st.button("🚪 Cerrar sesión", use_container_width=True):
+            if st.button("📚 Historial", use_container_width=True, key="pop_home_historial"):
+                st.session_state.vista = "paciente_historial"
+                st.rerun()
+            if st.button("🚪 Cerrar sesión", use_container_width=True, key="pop_home_cerrar"):
                 cerrar_sesion()
 
     # Consentimiento
@@ -1892,7 +2182,11 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         momentos_dia = [m["momento"] for m in med_dia]
         tomas_orden = ["mañana-1", "mañana-2", "tarde-1", "tarde-2"]
         proxima = next((tt for tt in tomas_orden if tt not in momentos_dia), None)
-        dias_completos = sum(1 for d in range(1, 8) if len(tomas_de_dia(mediciones, d)) >= 4)
+        # Día completo = tiene los 4 momentos únicos (mañana-1/2, tarde-1/2)
+        dias_completos = sum(
+            1 for d in range(1, 8)
+            if len(set(t.get("momento", "") for t in tomas_de_dia(mediciones, d))) >= 4
+        )
         faltantes = dias_con_faltantes(mediciones) if mediciones else []
 
         col_h1, col_h2 = st.columns([2, 1])
@@ -1934,8 +2228,8 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
 
         dias_html = ""
         for d_num in range(1, 8):
-            n_tomas = len(tomas_de_dia(mediciones, d_num)) if mediciones else 0
-            if n_tomas >= 4:
+            momentos_dia_x = set(t.get("momento", "") for t in tomas_de_dia(mediciones, d_num)) if mediciones else set()
+            if len(momentos_dia_x) >= 4:
                 cls = "day-done"
             elif d_num == dia_actual:
                 cls = "day-today"
@@ -2015,25 +2309,41 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             resultado = calcular_resultado(mediciones)
             st.markdown("### 🎯 Resultado de tu monitoreo")
             if resultado:
+                def _disp(v, suf=""):
+                    return f"{v}{suf}" if v is not None else "—"
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
-                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{resultado["sis_manana"]}/{resultado["dia_manana"]}</div><div class="art-metric-label">Promedio mañana</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{_disp(resultado.get("sis_manana"))}/{_disp(resultado.get("dia_manana"))}</div><div class="art-metric-label">Promedio mañana</div></div>', unsafe_allow_html=True)
                 with c2:
-                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{resultado["sis_tarde"]}/{resultado["dia_tarde"]}</div><div class="art-metric-label">Promedio tarde</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{_disp(resultado.get("sis_tarde"))}/{_disp(resultado.get("dia_tarde"))}</div><div class="art-metric-label">Promedio tarde</div></div>', unsafe_allow_html=True)
                 with c3:
-                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{resultado["sis_general"]}/{resultado["dia_general"]}</div><div class="art-metric-label">Promedio general</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{_disp(resultado.get("sis_general"))}/{_disp(resultado.get("dia_general"))}</div><div class="art-metric-label">Promedio general</div></div>', unsafe_allow_html=True)
                 with c4:
                     pulso_avg = resultado.get("pulso_general")
                     pulso_disp = f"{pulso_avg} bpm" if pulso_avg else "—"
                     st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{pulso_disp}</div><div class="art-metric-label">Pulso promedio</div></div>', unsafe_allow_html=True)
+
+                # Métrica de adherencia + calidad
+                adh = resultado.get("adherencia_pct")
+                tomas_ult6 = resultado.get("tomas_ult6", 0)
+                calidad = resultado.get("calidad", "")
+                col_a1, col_a2 = st.columns(2)
+                with col_a1:
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:22px;">{adh}%</div><div class="art-metric-label">Adherencia (sobre 28 tomas)</div></div>', unsafe_allow_html=True)
+                with col_a2:
+                    cal_color = {"ideal": "#10b981", "util": "#f59e0b", "insuficiente": "#ef4444"}.get(calidad, "#94a3b8")
+                    cal_label = {"ideal": "Ideal", "util": "Útil (parcial)", "insuficiente": "Insuficiente"}.get(calidad, "—")
+                    st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:18px;color:{cal_color};">{cal_label}</div><div class="art-metric-label">Calidad del informe · {tomas_ult6}/24 tomas últimos 6 días</div></div>', unsafe_allow_html=True)
+
                 st.caption("El resultado promedia los registros de los días 2 a 7 (se descarta el día 1, según protocolo).")
-                st.markdown("**Presión arterial**")
-                grafico_evolucion(mediciones)
-                st.markdown("**Frecuencia cardíaca**")
-                grafico_pulso(mediciones)
-                if resultado["tipo"] == "success":
+                if calidad != "insuficiente":
+                    st.markdown("**Presión arterial**")
+                    grafico_evolucion(mediciones)
+                    st.markdown("**Frecuencia cardíaca**")
+                    grafico_pulso(mediciones)
+                if resultado.get("tipo") == "success":
                     st.success(f"**{resultado['titulo']}** — {resultado['mensaje']}")
-                elif resultado["tipo"] == "warning":
+                elif resultado.get("tipo") == "warning":
                     st.warning(f"**{resultado['titulo']}** — {resultado['mensaje']}")
                 else:
                     st.error(f"**{resultado['titulo']}** — {resultado['mensaje']}")
@@ -2046,6 +2356,10 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     f'{generar_conclusion(resultado, mediciones)}'
                     f'</div>',
                     unsafe_allow_html=True)
+
+                # Aviso si ya se envió el PDF por mail
+                if paciente.get("ultimo_pdf_enviado_at"):
+                    st.info("📧 El informe en PDF se envió automáticamente a tu email cuando completaste el monitoreo.")
 
                 # Exportar PDF
                 eventos = obtener_eventos_adversos(codigo)
@@ -2061,6 +2375,32 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     )
                 except Exception as e:
                     st.warning(f"No se pudo generar el PDF: {e}")
+
+                # Botón de reiniciar procedimiento (con confirmación)
+                st.markdown("---")
+                st.markdown("#### 🔄 ¿Necesitás empezar un nuevo monitoreo?")
+                st.markdown('<p style="font-size:13px;color:#94a3b8;">Al reiniciar, este informe queda guardado en tu Historial y empezás un monitoreo nuevo de 7 días desde cero. Tus datos personales y tu medicación se conservan.</p>', unsafe_allow_html=True)
+                if not st.session_state.get("confirmar_reiniciar"):
+                    if st.button("🔄 Reiniciar procedimiento", use_container_width=True, key="btn_reiniciar"):
+                        st.session_state.confirmar_reiniciar = True
+                        st.rerun()
+                else:
+                    st.warning("⚠️ Vas a archivar este monitoreo en tu Historial y empezar uno nuevo. ¿Continuar?")
+                    cR1, cR2 = st.columns(2)
+                    with cR1:
+                        if st.button("Cancelar", use_container_width=True, key="btn_cancelar_reiniciar"):
+                            st.session_state.pop("confirmar_reiniciar", None)
+                            st.rerun()
+                    with cR2:
+                        if st.button("Sí, reiniciar", type="primary", use_container_width=True, key="btn_confirmar_reiniciar"):
+                            if archivar_procedimiento(codigo, paciente, mediciones, resultado, eventos, alertas):
+                                reiniciar_procedimiento_paciente(codigo)
+                                st.session_state.paciente_data = buscar_paciente(codigo)
+                                st.session_state.pop("confirmar_reiniciar", None)
+                                st.success("✅ Procedimiento archivado. ¡Empezamos uno nuevo!")
+                                st.rerun()
+                            else:
+                                st.error("No se pudo archivar el procedimiento. Probá de nuevo en unos segundos.")
 
         elif terminado_dia:
             # Mensaje grande cuando completó el día

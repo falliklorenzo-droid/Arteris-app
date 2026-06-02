@@ -6,4 +6,4 @@ altair
 bcrypt
 fpdf2
 matplotlib
-extra-streamlit-components
+streamlit-cookies-controller

@@ -760,7 +760,7 @@ def calcular_resultado(mediciones):
     if not mediciones or len(mediciones) < 28:
         return None
     df = pd.DataFrame(mediciones)
-    df["fecha_dt"] = pd.to_datetime(df["fecha"])
+    df["fecha_dt"] = pd.to_datetime(df["fecha"], format="mixed", errors="coerce")
     df["dia"] = df["fecha_dt"].dt.date
     dias = sorted(df["dia"].unique())
     if len(dias) >= 7:

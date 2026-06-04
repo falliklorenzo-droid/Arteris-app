@@ -3028,23 +3028,74 @@ elif st.session_state.vista == "medico_home":
                     badge = f'<span style="font-size:12px;color:#94a3b8;">{total}/28 tomas</span>'
 
                 with st.expander(f"{nombre_completo} · {p.get('email','?')}"):
+                    # ── Banner de ESTADO DEL PROTOCOLO ACTUAL ──
+                    p_expirado = protocolo_expirado(mediciones)
+                    p_abandonado = protocolo_abandonado(mediciones)
+                    p_cerrado = protocolo_cerrado(mediciones)
+                    p_dia_actual = dia_protocolo_actual(mediciones) if mediciones else 1
+                    es_insuf_actual = bool(resultado and resultado.get("calidad") == "insuficiente")
+                    tomas_ult6_actual = resultado.get("tomas_ult6", 0) if resultado else 0
+
+                    if not mediciones:
+                        estado_color = "#64748b"
+                        estado_titulo = "Sin iniciar"
+                        estado_detalle = "El paciente todavía no cargó ninguna toma."
+                    elif total >= 28 and not es_insuf_actual:
+                        estado_color = "#10b981"
+                        estado_titulo = "Protocolo completo"
+                        estado_detalle = f"{total}/28 tomas cargadas — informe válido."
+                    elif p_abandonado and not p_expirado:
+                        estado_color = "#ef4444"
+                        estado_titulo = "Cancelado por baja adherencia"
+                        estado_detalle = (
+                            f"Al día {p_dia_actual} solo cargó {total} toma{'s' if total != 1 else ''}. "
+                            f"Tomas en los últimos 6 días: {tomas_ult6_actual} (mínimo clínico: 12)."
+                        )
+                    elif p_expirado:
+                        if es_insuf_actual:
+                            estado_color = "#ef4444"
+                            estado_titulo = "Finalizado sin informe (insuficiente)"
+                            estado_detalle = (
+                                f"Pasaron los 7 días. Solo {tomas_ult6_actual} toma{'s' if tomas_ult6_actual != 1 else ''} "
+                                f"en los últimos 6 días (mínimo clínico: 12). Total cargado: {total}/28."
+                            )
+                        else:
+                            estado_color = "#f59e0b"
+                            estado_titulo = "Finalizado con informe parcial"
+                            estado_detalle = f"Pasaron los 7 días. {total}/28 tomas cargadas — informe útil pero no ideal."
+                    else:
+                        # Activo en curso
+                        estado_color = "#3b82f6"
+                        estado_titulo = f"En curso — Día {p_dia_actual} de 7"
+                        estado_detalle = f"{total}/28 tomas cargadas hasta ahora."
+
+                    st.markdown(f"""
+                    <div style="background:linear-gradient(90deg,{estado_color}1f,{estado_color}0a);
+                                border-left:4px solid {estado_color};border-radius:8px;
+                                padding:14px 18px;margin-bottom:1rem;">
+                      <div style="font-size:13px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;">Estado del protocolo actual</div>
+                      <div style="font-size:18px;color:{estado_color};font-weight:600;margin-top:4px;">{estado_titulo}</div>
+                      <div style="font-size:14px;color:#cbd5e1;margin-top:6px;">{estado_detalle}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         st.markdown(f'<div class="art-metric"><div class="art-metric-num">{total}</div><div class="art-metric-label">Tomas registradas</div></div>', unsafe_allow_html=True)
                     with c2:
-                        prom_txt = f"{resultado['sis_general']}/{resultado['dia_general']}" if resultado else "—"
+                        prom_txt = f"{resultado['sis_general']}/{resultado['dia_general']}" if (resultado and resultado.get("sis_general") is not None) else "—"
                         st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:24px;">{prom_txt}</div><div class="art-metric-label">Promedio mmHg</div></div>', unsafe_allow_html=True)
                     with c3:
                         st.markdown(f'<div class="art-metric">{badge}</div>', unsafe_allow_html=True)
 
-                    if resultado:
+                    if resultado and resultado.get("sis_manana") is not None:
                         st.markdown(
                             f'<div style="font-size:13px;color:#94a3b8;margin:8px 0;">'
                             f'Mañana: <strong style="color:#e8eef7;">{resultado["sis_manana"]}/{resultado["dia_manana"]}</strong> · '
                             f'Tarde: <strong style="color:#e8eef7;">{resultado["sis_tarde"]}/{resultado["dia_tarde"]}</strong></div>',
                             unsafe_allow_html=True)
 
-                    if total >= 4:
+                    if total >= 4 and not es_insuf_actual:
                         st.markdown("**Presión arterial**")
                         grafico_evolucion(mediciones)
                         st.markdown("**Frecuencia cardíaca**")
@@ -3073,8 +3124,8 @@ elif st.session_state.vista == "medico_home":
                         else:
                             st.caption("Sin alertas.")
 
-                    # Exportar PDF del paciente
-                    if total >= 28 and resultado:
+                    # Exportar PDF del paciente (solo si el informe actual es válido)
+                    if total >= 28 and resultado and not es_insuf_actual:
                         try:
                             pdf_bytes = generar_pdf_hbpm(p, mediciones, resultado, eventos_p, alertas_p)
                             st.download_button(
@@ -3087,6 +3138,75 @@ elif st.session_state.vista == "medico_home":
                             )
                         except Exception as e:
                             st.warning(f"No se pudo generar el PDF: {e}")
+                    elif total >= 28 and es_insuf_actual:
+                        st.info("📄 No hay PDF disponible para este monitoreo (informe insuficiente: menos de 12 tomas en los últimos 6 días).")
+
+                    # ── HISTORIAL DE MONITOREOS PREVIOS ──
+                    historial = obtener_historial_paciente(p["codigo"])
+                    if historial:
+                        with st.expander(f"📚 Historial de monitoreos previos ({len(historial)})", expanded=False):
+                            for h in historial:
+                                fecha_ini = str(h.get("fecha_inicio", ""))[:10] or "—"
+                                fecha_fin = str(h.get("fecha_fin", ""))[:10] or "—"
+                                res_h = h.get("resultado") or {}
+                                titulo_h = res_h.get("titulo", "—")
+                                adh_h = res_h.get("adherencia_pct")
+                                cal_h = res_h.get("calidad", "")
+                                tomas_h = res_h.get("tomas_ult6", 0)
+                                # Color y etiqueta según calidad
+                                if cal_h == "insuficiente":
+                                    chip = '<span style="background:rgba(239,68,68,0.15);color:#fca5a5;padding:3px 10px;border-radius:12px;font-size:12px;">Insuficiente</span>'
+                                elif cal_h == "ideal":
+                                    chip = '<span style="background:rgba(16,185,129,0.15);color:#6ee7b7;padding:3px 10px;border-radius:12px;font-size:12px;">Ideal</span>'
+                                elif cal_h == "util":
+                                    chip = '<span style="background:rgba(245,158,11,0.15);color:#fcd34d;padding:3px 10px;border-radius:12px;font-size:12px;">Útil parcial</span>'
+                                else:
+                                    chip = '<span style="background:rgba(100,116,139,0.15);color:#94a3b8;padding:3px 10px;border-radius:12px;font-size:12px;">—</span>'
+                                adh_str = f" · Adherencia {adh_h}%" if adh_h is not None else ""
+                                st.markdown(
+                                    f'<div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);'
+                                    f'border-radius:8px;padding:12px 14px;margin-bottom:10px;">'
+                                    f'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+                                    f'<div><strong style="color:#e8eef7;font-size:14px;">{fecha_ini} → {fecha_fin}</strong><br>'
+                                    f'<span style="font-size:13px;color:#94a3b8;">{titulo_h}{adh_str}</span></div>'
+                                    f'<div>{chip}</div>'
+                                    f'</div></div>',
+                                    unsafe_allow_html=True
+                                )
+                                # Mini detalle de promedios
+                                cph1, cph2, cph3 = st.columns(3)
+                                with cph1:
+                                    sm = res_h.get("sis_manana"); dm = res_h.get("dia_manana")
+                                    st.caption(f"Mañana: **{sm}/{dm}**" if sm is not None else "Mañana: —")
+                                with cph2:
+                                    st_h = res_h.get("sis_tarde"); dt_h = res_h.get("dia_tarde")
+                                    st.caption(f"Tarde: **{st_h}/{dt_h}**" if st_h is not None else "Tarde: —")
+                                with cph3:
+                                    pl_h = res_h.get("pulso_general")
+                                    st.caption(f"Pulso: **{pl_h} bpm**" if pl_h else "Pulso: —")
+                                # PDF descargable solo si la calidad permite
+                                if cal_h != "insuficiente":
+                                    try:
+                                        pdf_h_bytes = generar_pdf_hbpm(
+                                            p,
+                                            h.get("mediciones") or [],
+                                            res_h,
+                                            h.get("eventos") or [],
+                                            h.get("alertas") or [],
+                                        )
+                                        st.download_button(
+                                            f"📄 Descargar informe del {fecha_fin}",
+                                            data=pdf_h_bytes,
+                                            file_name=f"HBPM_{p.get('apellido','')}_{fecha_fin}.pdf",
+                                            mime="application/pdf",
+                                            key=f"pdf_hist_{p['codigo']}_{h.get('id','')}",
+                                            use_container_width=True,
+                                        )
+                                    except Exception:
+                                        pass
+                                else:
+                                    st.caption(f"Tomas en los últimos 6 días: {tomas_h} (menos del mínimo de 12; sin PDF).")
+                                st.markdown("---")
 
                     # Notas privadas del médico
                     st.markdown("##### 📝 Notas privadas")

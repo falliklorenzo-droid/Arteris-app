@@ -2407,7 +2407,14 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             </div>
             """, unsafe_allow_html=True)
         with col_h2:
-            st.markdown(f'<div class="art-metric"><div class="art-metric-num">{dias_completos}/7</div><div class="art-metric-label">Días completados</div></div>', unsafe_allow_html=True)
+            # Sin caja: solo texto alineado a la derecha
+            st.markdown(
+                f'<div style="text-align:right;padding-top:0.5rem;">'
+                f'<div style="font-family:\'DM Serif Display\',serif;font-size:46px;color:#3b82f6;line-height:1;">{dias_completos}/7</div>'
+                f'<div style="font-size:15px;color:#94a3b8;margin-top:6px;">Días completados</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
         # Banner del día actual: "Este es el día N de tu seguimiento"
         es_manana = proxima is not None and proxima.startswith("mañana")
@@ -2494,9 +2501,13 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 Si tomaste la presión esos días pero te olvidaste de cargarla en la app, podés agregarla ahora.
                 <strong style="color:#e8eef7;">Hacé clic en el botón "Cargar" al lado de cada toma faltante</strong> y completá los datos.
               </p>
+              <p style="font-size:13px;color:#94a3b8;line-height:1.5;margin:10px 0 0 0;font-style:italic;">
+                Si no llegás a cargar las que te faltan, no te preocupes — seguí adelante con las tomas de hoy.
+                Cada toma que cargues ayuda al resultado final.
+              </p>
             </div>
             """, unsafe_allow_html=True)
-            with st.expander(f"👉 Ver y completar las {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''}", expanded=True):
+            with st.expander(f"👉 Ver y completar las {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''}", expanded=False):
                 st.markdown('<p style="font-size:13px;color:#94a3b8;">Las tomas atrasadas quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
                 for f in faltantes:
                     tomas_faltantes_lista = [t for t in tomas_orden if t not in f["momentos_cargados"]]
@@ -2552,7 +2563,22 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
 
         if cerrado:
             resultado = calcular_resultado(mediciones)
-            # Banner de "cierre forzado" si el protocolo se cerró por abandono o expiración
+            es_insuficiente = bool(resultado and resultado.get("calidad") == "insuficiente")
+            # Banner de "cierre forzado" si el protocolo se cerró por abandono o expiración.
+            # Si además el informe es insuficiente, fusionamos ese aviso adentro del mismo banner.
+            insuf_msg = ""
+            if es_insuficiente and resultado:
+                tomas_ult6 = resultado.get("tomas_ult6", 0)
+                insuf_msg = (
+                    f'<div style="background:rgba(239,68,68,0.10);border-left:3px solid #ef4444;'
+                    f'padding:10px 14px;margin-top:14px;border-radius:6px;font-size:15px;color:#e8eef7;line-height:1.5;">'
+                    f'<strong style="color:#fca5a5;">⚠️ Informe insuficiente.</strong> '
+                    f'Solo {tomas_ult6} toma{"s" if tomas_ult6 != 1 else ""} en los últimos 6 días. '
+                    f'Según los estándares clínicos actuales (mínimo 12 tomas en 6 días) <strong>no es posible '
+                    f'generar un informe ni descargar el PDF</strong>.'
+                    f'</div>'
+                )
+
             if abandonado and not (total >= 28):
                 dias_rest = max(0, 7 - dia_actual + 1)
                 max_pos = total + 4 * dias_rest
@@ -2579,6 +2605,7 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     </div>
                   </div>
                   <p style="font-size:14px;color:#cbd5e1;line-height:1.5;margin:14px 0 0 0;">Te recomendamos <strong style="color:#e8eef7;">reiniciar el monitoreo</strong> cuando estés listo para hacerlo en los 7 días seguidos. El procedimiento actual se archivará en tu Historial.</p>
+                  {insuf_msg}
                 </div>
                 """, unsafe_allow_html=True)
             elif expirado and not (total >= 28):
@@ -2591,6 +2618,21 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                       <div style="font-size:15px;color:#e8eef7;margin-top:6px;">Pasaron los 7 días del seguimiento. Ya no se pueden cargar más tomas en este procedimiento.</div>
                     </div>
                   </div>
+                  {insuf_msg}
+                </div>
+                """, unsafe_allow_html=True)
+            elif total >= 28 and es_insuficiente:
+                # Caso raro: completó 28 tomas pero distribuidas mal y los últimos 6 días no llegan a 12
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,rgba(239,68,68,0.20),rgba(239,68,68,0.05));border:2px solid #ef4444;border-radius:14px;padding:1.5rem 1.75rem;margin:1rem 0;">
+                  <div style="display:flex;align-items:center;gap:14px;">
+                    <div style="font-size:42px;line-height:1;">⚠️</div>
+                    <div>
+                      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#ef4444;font-weight:500;">Monitoreo completado pero insuficiente</div>
+                      <div style="font-size:15px;color:#e8eef7;margin-top:6px;">Cargaste las 28 tomas pero distribuidas mal en el tiempo.</div>
+                    </div>
+                  </div>
+                  {insuf_msg}
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -2623,57 +2665,83 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     st.markdown(f'<div class="art-metric"><div class="art-metric-num" style="font-size:18px;color:{cal_color};">{cal_label}</div><div class="art-metric-label">Calidad del informe · {tomas_ult6}/24 tomas últimos 6 días</div></div>', unsafe_allow_html=True)
 
                 st.caption("El resultado promedia los registros de los días 2 a 7 (se descarta el día 1, según protocolo).")
-                if calidad != "insuficiente":
+                if not es_insuficiente:
                     st.markdown("**Presión arterial**")
                     grafico_evolucion(mediciones)
                     st.markdown("**Frecuencia cardíaca**")
                     grafico_pulso(mediciones)
-                if resultado.get("tipo") == "success":
-                    st.success(f"**{resultado['titulo']}** — {resultado['mensaje']}")
-                elif resultado.get("tipo") == "warning":
-                    st.warning(f"**{resultado['titulo']}** — {resultado['mensaje']}")
-                else:
-                    st.error(f"**{resultado['titulo']}** — {resultado['mensaje']}")
 
-                # Mini conclusión orientativa
-                st.markdown(
-                    f'<div style="background:rgba(59,130,246,0.06);border-left:3px solid #3b82f6;'
-                    f'padding:12px 16px;border-radius:6px;margin-top:0.75rem;font-size:14px;color:#cbd5e1;line-height:1.6;">'
-                    f'<strong style="color:#e8eef7;">🩺 Conclusión orientativa:</strong><br>'
-                    f'{generar_conclusion(resultado, mediciones)}'
-                    f'</div>',
-                    unsafe_allow_html=True)
+                # Mensaje de categoría — solo si el informe es válido (no insuficiente)
+                # (Cuando es insuficiente, ya lo dijimos dentro del banner rojo de arriba.)
+                if not es_insuficiente:
+                    if resultado.get("tipo") == "success":
+                        st.success(f"**{resultado['titulo']}** — {resultado['mensaje']}")
+                    elif resultado.get("tipo") == "warning":
+                        st.warning(f"**{resultado['titulo']}** — {resultado['mensaje']}")
+                    else:
+                        st.error(f"**{resultado['titulo']}** — {resultado['mensaje']}")
 
-                # Exportar PDF + envío diferido por mail si todavía no se envió
+                    # Mini conclusión orientativa solo si hay informe clínicamente válido
+                    st.markdown(
+                        f'<div style="background:rgba(59,130,246,0.06);border-left:3px solid #3b82f6;'
+                        f'padding:12px 16px;border-radius:6px;margin-top:0.75rem;font-size:14px;color:#cbd5e1;line-height:1.6;">'
+                        f'<strong style="color:#e8eef7;">🩺 Conclusión orientativa:</strong><br>'
+                        f'{generar_conclusion(resultado, mediciones)}'
+                        f'</div>',
+                        unsafe_allow_html=True)
+
+                # PDF: solo se genera/envía/descarga si el informe es clínicamente válido
                 eventos = obtener_eventos_adversos(codigo)
                 alertas = obtener_alertas(codigo)
-                pdf_bytes = None
-                try:
-                    pdf_bytes = generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas)
-                except Exception:
-                    pdf_bytes = None
-
-                # Si no llegó a enviarse el PDF en su momento, lo enviamos ahora
-                if pdf_bytes and not paciente.get("ultimo_pdf_enviado_at") and paciente.get("email"):
-                    try:
-                        if enviar_pdf_informe(paciente.get("email"), paciente.get("nombre", ""), pdf_bytes):
-                            actualizar_paciente(codigo, {"ultimo_pdf_enviado_at": now_arg().isoformat()})
-                            st.session_state.paciente_data = buscar_paciente(codigo)
-                            paciente = st.session_state.paciente_data
-                    except Exception:
-                        pass
-
-                if paciente.get("ultimo_pdf_enviado_at"):
-                    st.info("📧 El informe en PDF se envió a tu email. Revisalo y guardalo. También podés descargarlo abajo.")
-
-                if pdf_bytes:
-                    st.download_button(
-                        "📄 Descargar informe HBPM en PDF",
-                        data=pdf_bytes,
-                        file_name=f"HBPM_{paciente.get('apellido','')}_{codigo}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
+                if es_insuficiente:
+                    # Avisar al paciente que NO se genera PDF + mandar mail explicativo si no se mandó
+                    st.markdown(
+                        '<div style="background:rgba(239,68,68,0.08);border-left:3px solid #ef4444;'
+                        'padding:12px 16px;border-radius:6px;margin-top:0.75rem;font-size:15px;color:#fecaca;line-height:1.6;">'
+                        '📄 <strong>No se genera el informe en PDF</strong> porque la cantidad de tomas en los últimos 6 días '
+                        'es menor al mínimo clínico (12 tomas). Para tener un informe válido, reiniciá el monitoreo abajo.'
+                        '</div>',
+                        unsafe_allow_html=True
                     )
+                    # Mail de cierre sin PDF (una sola vez)
+                    if not paciente.get("mail_expiracion_enviado_at") and paciente.get("email"):
+                        try:
+                            if enviar_mail_expiracion(paciente.get("email"), paciente.get("nombre", "")):
+                                actualizar_paciente(codigo, {"mail_expiracion_enviado_at": now_arg().isoformat()})
+                                st.session_state.paciente_data = buscar_paciente(codigo)
+                                paciente = st.session_state.paciente_data
+                        except Exception:
+                            pass
+                    if paciente.get("mail_expiracion_enviado_at"):
+                        st.info("📧 Te enviamos un email avisando que el monitoreo finalizó sin informe.")
+                else:
+                    pdf_bytes = None
+                    try:
+                        pdf_bytes = generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas)
+                    except Exception:
+                        pdf_bytes = None
+
+                    # Si no llegó a enviarse el PDF en su momento, lo enviamos ahora
+                    if pdf_bytes and not paciente.get("ultimo_pdf_enviado_at") and paciente.get("email"):
+                        try:
+                            if enviar_pdf_informe(paciente.get("email"), paciente.get("nombre", ""), pdf_bytes):
+                                actualizar_paciente(codigo, {"ultimo_pdf_enviado_at": now_arg().isoformat()})
+                                st.session_state.paciente_data = buscar_paciente(codigo)
+                                paciente = st.session_state.paciente_data
+                        except Exception:
+                            pass
+
+                    if paciente.get("ultimo_pdf_enviado_at"):
+                        st.info("📧 El informe en PDF se envió a tu email. Revisalo y guardalo. También podés descargarlo abajo.")
+
+                    if pdf_bytes:
+                        st.download_button(
+                            "📄 Descargar informe HBPM en PDF",
+                            data=pdf_bytes,
+                            file_name=f"HBPM_{paciente.get('apellido','')}_{codigo}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
 
                 # Botón de reiniciar procedimiento (con confirmación)
                 st.markdown("---")

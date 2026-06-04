@@ -347,12 +347,11 @@ def crear_paciente(nombre, apellido, email, medico_id):
 
 def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_dia=None, atrasada=False):
     """Guarda una medición. Si fecha_dia se especifica, la toma se asigna a ese día
-    (formato YYYY-MM-DD) y se marca como atrasada. Si las columnas nuevas no existen
-    todavía en Supabase, intenta de nuevo sin ellas."""
+    (formato YYYY-MM-DD). El flag 'atrasada' debe pasarse explícitamente.
+    Si las columnas nuevas no existen todavía en Supabase, intenta de nuevo sin ellas."""
     ahora = now_arg()
     if fecha_dia:
         fecha_iso = f"{fecha_dia}T{ahora.strftime('%H:%M:%S')}-03:00"
-        atrasada = True
     else:
         fecha_iso = ahora.isoformat()
     payload = {
@@ -670,6 +669,39 @@ def enviar_activacion_medico(nombre, email):
         st.error(f"Error al enviar el email: {e}")
         return False
 
+def enviar_mail_expiracion(email, nombre=""):
+    """Mail único que se envía cuando se cumplieron los 7 días del protocolo y el monitoreo
+    quedó incompleto (no se llegó al mínimo de 12 tomas en los últimos 6 días)."""
+    try:
+        resend.api_key = get_secret("resend", "api_key")
+        url = f"{APP_URL}/?vista=paciente"
+        resend.Emails.send({
+            "from": "Arteris <noreply@arterismed.com>",
+            "to": email,
+            "subject": "Tu monitoreo HBPM finalizó sin resultado · Arteris",
+            "html": f"""
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a1628;color:#e8eef7;border-radius:12px;overflow:hidden;">
+              <div style="background:#1d4ed8;padding:24px 32px;">
+                <h1 style="font-size:24px;margin:0;color:white;font-weight:400;">Arteris</h1>
+                <p style="font-size:12px;color:rgba(255,255,255,0.7);margin:4px 0 0;letter-spacing:1px;text-transform:uppercase;">Monitoreo Domiciliario de Presión Arterial</p>
+              </div>
+              <div style="padding:32px;">
+                <p style="font-size:16px;">Hola{(' ' + nombre) if nombre else ''},</p>
+                <p style="color:#94a3b8;line-height:1.6;">Pasaron los <strong style="color:#e8eef7;">7 días</strong> del protocolo HBPM y tu monitoreo no llegó al mínimo de tomas que requieren los estándares clínicos actuales (12 tomas en los últimos 6 días).</p>
+                <p style="color:#94a3b8;line-height:1.6;">Por eso no pudimos calcular un resultado útil. Si querés volver a empezar el monitoreo:</p>
+                <div style="text-align:center;margin:24px 0;">
+                  <a href="{url}" style="background:#1d4ed8;color:white;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:15px;display:inline-block;">Reiniciar el monitoreo →</a>
+                </div>
+                <p style="color:#94a3b8;line-height:1.6;font-size:14px;">También te recomendamos consultar con tu médico tratante para evaluar el siguiente paso.</p>
+                <p style="font-size:11px;color:#64748b;margin-top:20px;">No vas a recibir más recordatorios por mail hasta que reinicies el monitoreo.</p>
+              </div>
+            </div>"""
+        })
+        return True
+    except Exception as e:
+        print(f"Error enviando mail expiración: {e}")
+        return False
+
 def enviar_pdf_informe(email, nombre, pdf_bytes):
     """Envía el PDF del informe HBPM adjunto al paciente cuando completa el monitoreo."""
     try:
@@ -754,7 +786,10 @@ def reiniciar_procedimiento_paciente(codigo):
     except Exception:
         pass
     try:
-        sb.table("pacientes").update({"ultimo_pdf_enviado_at": None}).eq("codigo", codigo).execute()
+        sb.table("pacientes").update({
+            "ultimo_pdf_enviado_at": None,
+            "mail_expiracion_enviado_at": None,
+        }).eq("codigo", codigo).execute()
     except Exception:
         pass
 
@@ -818,6 +853,45 @@ def dia_protocolo_actual(mediciones):
     inicio = fecha_inicio_protocolo(mediciones)
     transcurridos = (hoy_arg() - inicio).days + 1
     return max(1, min(transcurridos, 7))
+
+def protocolo_expirado(mediciones):
+    """True si ya pasaron los 7 días del protocolo (estamos en día 8 o posterior)."""
+    if not mediciones:
+        return False
+    inicio = fecha_inicio_protocolo(mediciones)
+    return (hoy_arg() - inicio).days >= 7
+
+def protocolo_abandonado(mediciones):
+    """True si el protocolo no va a llegar al mínimo clínico (12 tomas).
+    Se considera abandonado si:
+    (A) Es matemáticamente imposible llegar a 12 tomas en lo que queda del protocolo,
+        asumiendo que cargara perfecto los días restantes (4 tomas/día):
+        total + 4 × (días restantes) < 12.
+    (B) Muy baja adherencia: desde el día 4 en adelante, menos de 1 toma/día promedio
+        (total < día actual). Catch de los casos donde matemáticamente todavía es posible
+        pero clínicamente improbable (ej: día 5 con 2 tomas)."""
+    if not mediciones:
+        return False
+    dia_act = dia_protocolo_actual(mediciones)
+    total = len(mediciones)
+
+    # (A) Imposibilidad matemática
+    dias_restantes = max(0, 7 - dia_act + 1)  # incluye el día actual
+    if (total + 4 * dias_restantes) < 12:
+        return True
+
+    # (B) Adherencia muy baja
+    if dia_act >= 4 and total < dia_act:
+        return True
+
+    return False
+
+def protocolo_cerrado(mediciones):
+    """True si el monitoreo está cerrado por cualquier motivo:
+    - Se completaron las 28 tomas, o
+    - Pasaron los 7 días del protocolo, o
+    - El paciente abandonó (adherencia <1 toma/día desde día 4)."""
+    return (len(mediciones) >= 28) or protocolo_expirado(mediciones) or protocolo_abandonado(mediciones)
 
 def fecha_de_dia(mediciones, dia_num):
     """Devuelve la fecha calendario que corresponde al día N del protocolo."""
@@ -1435,51 +1509,103 @@ if "activar_medico_token" not in st.session_state:
 if "reset_token" not in st.session_state:
     st.session_state.reset_token = params.get("reset", "")
 
-# ── Sesión persistente 30 días (cookie) ───────────────────────────────────────
-# Usamos streamlit_cookies_controller, mucho más confiable que extra_streamlit_components.
+# ── Sesión persistente 30 días (localStorage + cookie como backup) ────────────
+# Usamos streamlit_javascript para leer/escribir localStorage del navegador.
+# localStorage es más persistente que cookies y no depende de timing del componente.
+try:
+    from streamlit_javascript import st_javascript
+    _SJ_OK = True
+except Exception:
+    _SJ_OK = False
+
 try:
     from streamlit_cookies_controller import CookieController
     cookie_controller = CookieController()
 except Exception:
     cookie_controller = None
+cookie_manager = cookie_controller  # compat con código viejo
+
+def _ls_save(token):
+    """Guarda token en localStorage del navegador via JS."""
+    if not _SJ_OK or not token:
+        return
+    try:
+        st_javascript(
+            f"localStorage.setItem('arteris_session', '{token}'); 'ok';",
+            key=f"_ls_save_{token[:10]}",
+        )
+    except Exception:
+        pass
+
+def _ls_read():
+    """Lee token de localStorage del navegador via JS. Devuelve None si no hay
+    o si todavía no respondió (primer render)."""
+    if not _SJ_OK:
+        return None
+    try:
+        val = st_javascript(
+            "localStorage.getItem('arteris_session') || ''",
+            key="_ls_read_session",
+        )
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+def _ls_clear():
+    """Borra el token del localStorage."""
+    if not _SJ_OK:
+        return
+    try:
+        st_javascript(
+            "localStorage.removeItem('arteris_session'); 'ok';",
+            key=f"_ls_clear_{_secrets.token_hex(4)}",
+        )
+    except Exception:
+        pass
 
 def set_session_cookie(token, expires):
-    if cookie_controller is None or not token:
+    """Guarda el token de sesión en localStorage Y cookie (doble redundancia)."""
+    if not token:
         return
-    try:
-        # max_age en segundos (30 días)
-        max_age = int((expires - now_arg()).total_seconds())
-        cookie_controller.set("arteris_session", token, max_age=max_age, path="/", same_site="lax")
-    except Exception:
+    _ls_save(token)
+    if cookie_controller is not None:
         try:
-            cookie_controller.set("arteris_session", token)
+            max_age = int((expires - now_arg()).total_seconds())
+            cookie_controller.set("arteris_session", token, max_age=max_age, path="/", same_site="lax")
         except Exception:
-            pass
+            try:
+                cookie_controller.set("arteris_session", token)
+            except Exception:
+                pass
 
 def clear_session_cookie():
-    if cookie_controller is None:
-        return
-    try:
-        cookie_controller.remove("arteris_session", path="/")
-    except Exception:
+    """Borra el token de localStorage Y cookie."""
+    _ls_clear()
+    if cookie_controller is not None:
         try:
-            cookie_controller.remove("arteris_session")
+            cookie_controller.remove("arteris_session", path="/")
         except Exception:
-            pass
+            try:
+                cookie_controller.remove("arteris_session")
+            except Exception:
+                pass
 
 def leer_session_cookie():
-    if cookie_controller is None:
-        return None
-    try:
-        return cookie_controller.get("arteris_session")
-    except Exception:
-        return None
-
-# Compatibility shim: el código viejo usa "cookie_manager"; lo aliasamos.
-cookie_manager = cookie_controller
+    """Lee el token primero de localStorage, luego de cookie como fallback."""
+    tok = _ls_read()
+    if tok:
+        return tok
+    if cookie_controller is not None:
+        try:
+            return cookie_controller.get("arteris_session")
+        except Exception:
+            return None
+    return None
 
 def iniciar_sesion_persistente(tipo, ident):
-    """Crea un token de sesión en DB y lo guarda en cookie (30 días)."""
+    """Crea un token de sesión en DB y lo guarda en localStorage + cookie (30 días)."""
     expires = now_arg() + timedelta(days=30)
     token = None
     if tipo == "paciente":
@@ -1489,13 +1615,12 @@ def iniciar_sesion_persistente(tipo, ident):
     if token:
         set_session_cookie(token, expires)
 
-# Restaurar sesión desde cookie si todavía no hay rol cargado.
-# Nota: el componente de cookies puede tardar 1 render en estar listo, así que
-# si en el primer intento no devuelve nada hacemos un rerun único para reintentar.
-if cookie_manager is not None and not st.session_state.get("rol"):
-    tok_cookie = leer_session_cookie()
-    if tok_cookie:
-        tipo, registro = validar_session(tok_cookie)
+# Restaurar sesión si todavía no hay rol cargado.
+# Damos hasta 3 reruns para que localStorage / cookies estén listos.
+if not st.session_state.get("rol"):
+    tok_persistente = leer_session_cookie()
+    if tok_persistente:
+        tipo, registro = validar_session(tok_persistente)
         if registro:
             if tipo == "paciente":
                 st.session_state.paciente_data = registro
@@ -1506,17 +1631,20 @@ if cookie_manager is not None and not st.session_state.get("rol"):
                 st.session_state.medico_data = registro
                 st.session_state.rol = "medico"
                 st.session_state.vista = "medico_home"
-    elif not st.session_state.get("_cookie_retry_done"):
-        st.session_state["_cookie_retry_done"] = True
-        st.rerun()
+    else:
+        retries = int(st.session_state.get("_persist_retry", 0) or 0)
+        if retries < 3:
+            st.session_state["_persist_retry"] = retries + 1
+            st.rerun()
 
 def cerrar_sesion():
-    # Limpiar cookie + token en DB
+    """Cierra sesión: invalida token en DB + borra localStorage + cookie + session_state."""
     tok = leer_session_cookie()
     if tok:
         invalidar_session(tok)
     clear_session_cookie()
-    for k in ["vista", "usuario", "rol", "medico_data", "paciente_data", "codigo_paciente", "consentimiento_ok"]:
+    for k in ["vista", "usuario", "rol", "medico_data", "paciente_data",
+              "codigo_paciente", "consentimiento_ok", "_persist_retry"]:
         if k in st.session_state:
             del st.session_state[k]
     st.rerun()
@@ -2209,6 +2337,11 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         )
         faltantes = dias_con_faltantes(mediciones) if mediciones else []
 
+        # Flags de cierre del protocolo
+        expirado = protocolo_expirado(mediciones)
+        abandonado = protocolo_abandonado(mediciones)
+        cerrado = protocolo_cerrado(mediciones)
+
         col_h1, col_h2 = st.columns([2, 1])
         with col_h1:
             st.markdown(f"""
@@ -2225,7 +2358,7 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         es_tarde = proxima is not None and proxima.startswith("tarde")
         terminada_manana = "mañana-1" in momentos_dia and "mañana-2" in momentos_dia
         terminado_dia = proxima is None
-        if total < 28:
+        if total < 28 and not cerrado:
             if terminado_dia:
                 banner_color = "#10b981"
                 banner_emoji = "✅"
@@ -2269,10 +2402,46 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         </div>
         """, unsafe_allow_html=True)
 
-        # Aviso de tomas atrasadas (con formulario inline por cada toma faltante)
-        if faltantes:
-            with st.expander(f"⚠️ Tenés tomas pendientes de días anteriores ({len(faltantes)} día{'s' if len(faltantes)>1 else ''})", expanded=False):
-                st.markdown('<p style="font-size:13px;color:#94a3b8;">Si te olvidaste de cargar pero tomaste la presión, podés agregar las tomas de días anteriores. Quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
+        # Aviso si la data tiene tomas fuera del protocolo de 7 días (datos viejos con bug)
+        try:
+            fechas_unicas = sorted({parse_fecha_local(m.get("fecha")) for m in mediciones if parse_fecha_local(m.get("fecha"))})
+            if len(fechas_unicas) > 7:
+                st.warning(
+                    f"⚠️ Tu monitoreo tiene tomas distribuidas en **{len(fechas_unicas)} días** "
+                    f"(el protocolo es de 7 días). Esto puede pasar si una toma se cargó muy tarde "
+                    f"por la noche o quedó asignada a un día distinto. **No afecta el resultado** "
+                    f"(usamos los últimos 6 días según el protocolo), pero si querés empezar limpio "
+                    f"podés usar el botón **Reiniciar procedimiento** cuando lo completes."
+                )
+        except Exception:
+            pass
+
+        # Aviso de tomas atrasadas — banner grande y visible para que adultos mayores no lo pasen por alto
+        # Solo se muestra mientras el protocolo está activo (no cerrado por ningún motivo).
+        if faltantes and not cerrado:
+            tomas_pendientes_total = sum(4 - f["tomas_cargadas"] for f in faltantes)
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(245,158,11,0.06));
+                        border:2px solid #f59e0b;border-radius:14px;padding:1.5rem 1.75rem;margin:1rem 0;">
+              <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+                <div style="font-size:42px;line-height:1;">⚠️</div>
+                <div>
+                  <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#f59e0b;font-weight:500;line-height:1.2;">
+                    Tenés {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''} de cargar
+                  </div>
+                  <div style="font-size:15px;color:#e8eef7;margin-top:4px;">
+                    En {len(faltantes)} día{'s' if len(faltantes)>1 else ''} anterior{'es' if len(faltantes)>1 else ''} te faltó cargar la presión.
+                  </div>
+                </div>
+              </div>
+              <p style="font-size:14px;color:#cbd5e1;line-height:1.5;margin:8px 0 0 0;">
+                Si tomaste la presión esos días pero te olvidaste de cargarla en la app, podés agregarla ahora.
+                <strong style="color:#e8eef7;">Hacé clic en el botón "Cargar" al lado de cada toma faltante</strong> y completá los datos.
+              </p>
+            </div>
+            """, unsafe_allow_html=True)
+            with st.expander(f"👉 Ver y completar las {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''}", expanded=True):
+                st.markdown('<p style="font-size:13px;color:#94a3b8;">Las tomas atrasadas quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
                 for f in faltantes:
                     tomas_faltantes_lista = [t for t in tomas_orden if t not in f["momentos_cargados"]]
                     st.markdown(f"**Día {f['dia']}** ({f['fecha'].strftime('%d/%m/%Y')}) — {f['tomas_cargadas']}/4 tomas cargadas.")
@@ -2325,8 +2494,50 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                                 st.rerun()
                     st.markdown("---")
 
-        if total >= 28:
+        if cerrado:
             resultado = calcular_resultado(mediciones)
+            # Banner de "cierre forzado" si el protocolo se cerró por abandono o expiración
+            if abandonado and not (total >= 28):
+                dias_rest = max(0, 7 - dia_actual + 1)
+                max_pos = total + 4 * dias_rest
+                if max_pos < 12:
+                    explicacion = (
+                        f"Al día {dia_actual} hay solo {total} toma{'s' if total != 1 else ''} cargada{'s' if total != 1 else ''} "
+                        f"y quedan {dias_rest} día{'s' if dias_rest != 1 else ''} del protocolo. "
+                        f"Aunque cargaras todas las tomas restantes (4 por día), solo llegarías a {max_pos}, "
+                        f"y el mínimo clínico requerido es 12."
+                    )
+                else:
+                    explicacion = (
+                        f"Al día {dia_actual} hay solo {total} toma{'s' if total != 1 else ''} cargada{'s' if total != 1 else ''} "
+                        f"(menos de 1 toma/día). Por adherencia tan baja es muy improbable alcanzar el mínimo clínico "
+                        f"(12 tomas en los últimos 6 días)."
+                    )
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,rgba(239,68,68,0.20),rgba(239,68,68,0.05));border:2px solid #ef4444;border-radius:14px;padding:1.5rem 1.75rem;margin:1rem 0;">
+                  <div style="display:flex;align-items:center;gap:14px;">
+                    <div style="font-size:42px;line-height:1;">🛑</div>
+                    <div>
+                      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#ef4444;font-weight:500;">Procedimiento cancelado: tomas insuficientes</div>
+                      <div style="font-size:15px;color:#e8eef7;margin-top:6px;">{explicacion}</div>
+                    </div>
+                  </div>
+                  <p style="font-size:14px;color:#cbd5e1;line-height:1.5;margin:14px 0 0 0;">Te recomendamos <strong style="color:#e8eef7;">reiniciar el monitoreo</strong> cuando estés listo para hacerlo en los 7 días seguidos. El procedimiento actual se archivará en tu Historial.</p>
+                </div>
+                """, unsafe_allow_html=True)
+            elif expirado and not (total >= 28):
+                st.markdown(f"""
+                <div style="background:linear-gradient(135deg,rgba(239,68,68,0.20),rgba(239,68,68,0.05));border:2px solid #ef4444;border-radius:14px;padding:1.5rem 1.75rem;margin:1rem 0;">
+                  <div style="display:flex;align-items:center;gap:14px;">
+                    <div style="font-size:42px;line-height:1;">⏰</div>
+                    <div>
+                      <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#ef4444;font-weight:500;">El protocolo de 7 días finalizó</div>
+                      <div style="font-size:15px;color:#e8eef7;margin-top:6px;">Pasaron los 7 días del seguimiento. Ya no se pueden cargar más tomas en este procedimiento.</div>
+                    </div>
+                  </div>
+                </div>
+                """, unsafe_allow_html=True)
+
             st.markdown("### 🎯 Resultado de tu monitoreo")
             if resultado:
                 def _disp(v, suf=""):
@@ -2483,7 +2694,12 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 if (sis > 200 or dia > 120) and not confirmar_alto:
                     st.warning(f"⚠️ Los valores {sis}/{dia} son muy elevados. Marcá la casilla de confirmación si son correctos.")
                 else:
-                    guardar_medicion(codigo, sis, dia, proxima, pulso=int(pulso))
+                    # Fijamos la fecha del día N del protocolo (no del calendario actual)
+                    # para que tomas hechas tarde por la noche o con un día de retraso queden
+                    # en el día correcto del seguimiento.
+                    fecha_protocolo = fecha_de_dia(mediciones, dia_actual).isoformat() if mediciones else hoy_arg().isoformat()
+                    guardar_medicion(codigo, sis, dia, proxima, pulso=int(pulso),
+                                     fecha_dia=fecha_protocolo, atrasada=False)
                     st.success("✅ Medición guardada.")
                     st.rerun()
 

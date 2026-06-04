@@ -82,11 +82,53 @@ html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif !important;
     background-color: #0a1628 !important;
     color: #e8eef7 !important;
+    font-size: 17px !important;
 }
 .stApp {
     background-color: #0a1628 !important;
     min-height: 100vh;
 }
+
+/* === ACCESIBILIDAD: tamaños de letra aumentados para adultos mayores === */
+/* Texto general de Streamlit */
+.stMarkdown p, .stMarkdown li, .stMarkdown span,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] span {
+    font-size: 17px !important;
+    line-height: 1.6 !important;
+}
+.stMarkdown h1, [data-testid="stMarkdownContainer"] h1 { font-size: 32px !important; }
+.stMarkdown h2, [data-testid="stMarkdownContainer"] h2 { font-size: 26px !important; }
+.stMarkdown h3, [data-testid="stMarkdownContainer"] h3 { font-size: 22px !important; }
+.stMarkdown h4, [data-testid="stMarkdownContainer"] h4 { font-size: 19px !important; }
+
+/* Labels de inputs y selects */
+.stRadio label, .stCheckbox label,
+.stTextInput label, .stNumberInput label,
+.stSelectbox label, .stTextArea label, .stDateInput label,
+[data-testid="stWidgetLabel"] label,
+[data-testid="stWidgetLabel"] p {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+}
+/* Texto de las opciones de radio y checkbox */
+.stRadio div[role="radiogroup"] label, .stCheckbox label span {
+    font-size: 16px !important;
+}
+/* Valores que el usuario tipea en inputs */
+.stTextInput input, .stNumberInput input,
+.stTextArea textarea, .stDateInput input,
+.stSelectbox div[data-baseweb="select"] > div {
+    font-size: 17px !important;
+}
+/* Captions más grandes */
+.stCaption, [data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p { font-size: 14px !important; }
+/* Alerts (info, warning, success, error) */
+[data-testid="stAlert"], [data-testid="stAlert"] p { font-size: 16px !important; }
+/* Expanders */
+.streamlit-expanderHeader, [data-testid="stExpander"] summary { font-size: 17px !important; }
 section[data-testid="stSidebar"] { display: none; }
 
 /* Layout centrado y contenido */
@@ -118,9 +160,9 @@ section[data-testid="stSidebar"] { display: none; }
     background: linear-gradient(90deg, #1d4ed8, #3b82f6, #dc2626, transparent);
 }
 .logo-wrap { display: flex; align-items: center; gap: 10px; }
-.logo-text { font-family: 'DM Serif Display', serif; font-size: 26px; color: #e8eef7; letter-spacing: -0.5px; }
+.logo-text { font-family: 'DM Serif Display', serif; font-size: 30px; color: #e8eef7; letter-spacing: -0.5px; }
 .logo-text span { color: #dc2626; }
-.logo-tag { font-size: 10px; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
+.logo-tag { font-size: 12px; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
 
 /* Cards */
 .art-card {
@@ -144,14 +186,14 @@ section[data-testid="stSidebar"] { display: none; }
     border: 1px solid rgba(255,255,255,0.06);
     border-radius: 10px;
 }
-.art-metric-num { font-family: 'DM Serif Display', serif; font-size: 40px; color: #3b82f6; line-height: 1; }
-.art-metric-label { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+.art-metric-num { font-family: 'DM Serif Display', serif; font-size: 46px; color: #3b82f6; line-height: 1; }
+.art-metric-label { font-size: 15px; color: #94a3b8; margin-top: 6px; }
 
 /* Badges */
-.badge-ok { background: rgba(34,197,94,0.12); color: #22c55e; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
-.badge-warn { background: rgba(234,179,8,0.12); color: #eab308; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
-.badge-alert { background: rgba(220,38,38,0.14); color: #ef4444; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
-.badge-low { background: rgba(59,130,246,0.14); color: #60a5fa; padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+.badge-ok { background: rgba(34,197,94,0.12); color: #22c55e; padding: 5px 14px; border-radius: 20px; font-size: 14px; }
+.badge-warn { background: rgba(234,179,8,0.12); color: #eab308; padding: 5px 14px; border-radius: 20px; font-size: 14px; }
+.badge-alert { background: rgba(220,38,38,0.14); color: #ef4444; padding: 5px 14px; border-radius: 20px; font-size: 14px; }
+.badge-low { background: rgba(59,130,246,0.14); color: #60a5fa; padding: 5px 14px; border-radius: 20px; font-size: 14px; }
 
 /* Buttons */
 .stButton > button {
@@ -160,8 +202,9 @@ section[data-testid="stSidebar"] { display: none; }
     border: none !important;
     border-radius: 8px !important;
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 15px !important;
-    padding: 0.6rem 1.5rem !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    padding: 0.75rem 1.75rem !important;
     width: 100%;
 }
 .stButton > button:hover { background: #1e40af !important; }
@@ -170,7 +213,16 @@ section[data-testid="stSidebar"] { display: none; }
     color: white !important;
     border: none !important;
     border-radius: 8px !important;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    padding: 0.75rem 1.75rem !important;
     width: 100%;
+}
+/* Botones de formulario también */
+.stFormSubmitButton > button {
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    padding: 0.75rem 1.75rem !important;
 }
 
 /* Progress */
@@ -178,20 +230,20 @@ section[data-testid="stSidebar"] { display: none; }
 .art-progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1d4ed8, #06b6d4); }
 
 /* Day pills */
-.day-dots { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
-.day-dot { padding: 6px 14px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; border: 1px solid transparent; white-space: nowrap; }
+.day-dots { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+.day-dot { padding: 8px 16px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; border: 1px solid transparent; white-space: nowrap; }
 .day-done { background: rgba(16,185,129,0.15); color: #10b981; border-color: rgba(16,185,129,0.3); }
 .day-today { background: #1d4ed8; color: white; border-color: #3b82f6; }
 .day-pending { background: rgba(255,255,255,0.04); color: #64748b; border-color: rgba(255,255,255,0.06); }
 
 /* Typography */
-.section-eyebrow { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #3b82f6; margin-bottom: 8px; }
-.section-title { font-family: 'DM Serif Display', serif; font-size: 36px; color: #e8eef7; margin-bottom: 12px; line-height: 1.2; }
-.section-sub { font-size: 15px; color: #94a3b8; line-height: 1.7; margin-bottom: 1.5rem; }
+.section-eyebrow { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; color: #3b82f6; margin-bottom: 8px; }
+.section-title { font-family: 'DM Serif Display', serif; font-size: 42px; color: #e8eef7; margin-bottom: 12px; line-height: 1.2; }
+.section-sub { font-size: 17px; color: #94a3b8; line-height: 1.7; margin-bottom: 1.5rem; }
 
 /* Pasos */
-.paso-card { display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; }
-.paso-num { width:28px; height:28px; border-radius:50%; background:#1d4ed8; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; flex-shrink:0; color:white; }
+.paso-card { display:flex; gap:14px; align-items:flex-start; margin-bottom:14px; }
+.paso-num { width:32px; height:32px; border-radius:50%; background:#1d4ed8; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600; flex-shrink:0; color:white; }
 
 /* Footer */
 .arteris-footer {
@@ -201,8 +253,8 @@ section[data-testid="stSidebar"] { display: none; }
     width: 100%;
     margin-top: 4rem;
 }
-.inst-badge { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 6px 14px; font-size: 11px; color: #94a3b8; display: inline-block; margin: 4px; }
-.footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; margin-top: 1rem; font-size: 11px; color: #64748b; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.inst-badge { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 7px 14px; font-size: 13px; color: #94a3b8; display: inline-block; margin: 4px; }
+.footer-bottom { border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem; margin-top: 1rem; font-size: 13px; color: #64748b; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .footer-bottom a { color: #94a3b8; text-decoration: none; }
 
 /* Hide streamlit defaults */
@@ -210,18 +262,22 @@ section[data-testid="stSidebar"] { display: none; }
 footer { visibility: hidden; }
 header { visibility: hidden; }
 
-/* Responsive */
+/* Responsive — mantenemos textos legibles en mobile */
 @media (max-width: 768px) {
-    .arteris-nav { padding: 0 1rem; height: 56px; }
-    .logo-text { font-size: 20px; }
+    html, body, [class*="css"] { font-size: 16px !important; }
+    .arteris-nav { padding: 0 1rem; height: 60px; }
+    .logo-text { font-size: 24px; }
     .logo-tag { display: none; }
-    .section-title { font-size: 26px; }
-    .art-metric-num { font-size: 28px; }
-    .day-dot { padding: 5px 10px; font-size: 11px; }
+    .section-title { font-size: 32px; }
+    .art-metric-num { font-size: 34px; }
+    .day-dot { padding: 7px 12px; font-size: 13px; }
+    .stMarkdown p, [data-testid="stMarkdownContainer"] p { font-size: 16px !important; }
+    .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button { font-size: 16px !important; }
 }
 @media (max-width: 480px) {
-    .section-title { font-size: 22px; }
+    .section-title { font-size: 26px; }
     .art-card { padding: 1rem; }
+    .art-metric-num { font-size: 28px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -241,14 +297,14 @@ def navbar(subtitulo=""):
                 <div class="logo-tag" style="margin:0;padding:0;">Monitoreo Domiciliario de Presión Arterial</div>
             </div>
         </div>
-        <div style="font-size:13px;color:#94a3b8;">{subtitulo}</div>
+        <div style="font-size:16px;color:#94a3b8;">{subtitulo}</div>
     </div>
     """, unsafe_allow_html=True)
 
 def footer():
     st.markdown(f"""
     <div class="arteris-footer">
-        <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;">Protocolo basado en guías internacionales de hipertensión</div>
+        <div style="font-size:14px;color:#94a3b8;margin-bottom:8px;letter-spacing:1px;text-transform:uppercase;">Protocolo basado en guías internacionales de hipertensión</div>
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem;">
             <div class="inst-badge">Consenso Latinoamericano de HTA 2026</div>
             <div class="inst-badge">Sociedad Latinoamericana de Hipertensión</div>

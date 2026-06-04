@@ -160,8 +160,8 @@ section[data-testid="stSidebar"] { display: none; }
     background: linear-gradient(90deg, #1d4ed8, #3b82f6, #dc2626, transparent);
 }
 .logo-wrap { display: flex; align-items: center; gap: 10px; }
-.logo-text { font-family: 'DM Serif Display', serif; font-size: 30px; color: #e8eef7; letter-spacing: -0.5px; }
-.logo-text span { color: #dc2626; }
+.logo-text { font-family: 'DM Serif Display', serif; font-size: 30px !important; color: #e8eef7; letter-spacing: -0.5px; line-height: 1.1; }
+.logo-text span { color: #dc2626; font-size: 30px !important; font-family: 'DM Serif Display', serif !important; }
 .logo-tag { font-size: 12px; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-top: 1px; }
 
 /* Cards */
@@ -266,7 +266,8 @@ header { visibility: hidden; }
 @media (max-width: 768px) {
     html, body, [class*="css"] { font-size: 16px !important; }
     .arteris-nav { padding: 0 1rem; height: 60px; }
-    .logo-text { font-size: 24px; }
+    .logo-text { font-size: 24px !important; }
+    .logo-text span { font-size: 24px !important; }
     .logo-tag { display: none; }
     .section-title { font-size: 32px; }
     .art-metric-num { font-size: 34px; }
@@ -2175,8 +2176,8 @@ elif st.session_state.vista == "paciente_login":
         if st.session_state.codigo_paciente:
             paciente = buscar_paciente(st.session_state.codigo_paciente)
             if paciente and not paciente.get("password_set"):
-                st.markdown('<div class="art-card">', unsafe_allow_html=True)
-                st.markdown("### 🔐 Activá tu cuenta")
+                # Caso 1: todavía no creó contraseña — mostrar form de activación
+                st.markdown('<div class="art-card"><h3 style="margin-top:0;">🔐 Activá tu cuenta</h3>', unsafe_allow_html=True)
                 st.markdown(f'<p style="font-size:14px;color:#94a3b8;">Hola <strong style="color:#e8eef7;">{paciente.get("nombre","")}</strong>, creá tu contraseña para acceder a Arteris.</p>', unsafe_allow_html=True)
                 with st.form("form_activacion"):
                     pwd1 = st.text_input("Contraseña", type="password", placeholder="Mínimo 8 caracteres")
@@ -2199,8 +2200,16 @@ elif st.session_state.vista == "paciente_login":
                         iniciar_sesion_persistente("paciente", paciente["codigo"])
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
+            elif paciente and paciente.get("password_set") and (not paciente.get("consentimiento_aceptado") or not paciente.get("edad")):
+                # Caso 2: ya creó contraseña pero NO terminó el onboarding (consentimiento + datos personales)
+                # Lo dejamos continuar automáticamente con el link, sin pedirle login.
+                st.session_state.paciente_data = paciente
+                st.session_state.rol = "paciente"
+                st.session_state.vista = "paciente_home"
+                iniciar_sesion_persistente("paciente", paciente["codigo"])
+                st.rerun()
             elif paciente and paciente.get("password_set"):
-                # Cuenta ya activada → limpiar codigo y caer al login normal con tabs (incluye "Olvidé mi contraseña")
+                # Caso 3: cuenta ya activada y onboarding completo → limpiar codigo y caer al login normal
                 st.session_state.codigo_paciente = ""
                 try:
                     st.query_params.clear()

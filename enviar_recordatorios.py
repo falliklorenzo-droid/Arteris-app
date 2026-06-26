@@ -19,6 +19,7 @@ import os
 from datetime import datetime, timezone, timedelta
 import resend
 from supabase import create_client
+from evaluar_hbpm import evaluar_hbpm
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -68,8 +69,10 @@ def fecha_inicio(mediciones):
     return min(fechas) if fechas else None
 
 
-def html_recordatorio(nombre):
-    cargar_url = f"{APP_URL}/?vista=paciente"
+def html_recordatorio(nombre, token=None):
+    # Si el paciente tiene una sesión válida, el link la reusa (auto-login) y
+    # evita pedirle mail+contraseña en cada recordatorio. Si no, link normal.
+    cargar_url = f"{APP_URL}/?token={token}" if token else f"{APP_URL}/?vista=paciente"
     return f"""
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#0a1628;color:#e8eef7;border-radius:12px;overflow:hidden;">
       <div style="background:#1d4ed8;padding:24px 32px;">
@@ -147,32 +150,47 @@ def main():
             continue
 
         mediciones = obtener_mediciones(codigo)
+        ev = evaluar_hbpm(mediciones)   # fuente única de verdad (igual que la app)
         total = len(mediciones)
 
-        # Caso 1: ya terminó el protocolo (28 tomas)
+        # --- Exclusión mutua entre los DOS caminos de finalización ----------
+        # Si el monitoreo ya quedó resuelto por cualquiera de los dos caminos
+        # (PDF de "concluido" que manda la app, o mail de "insuficiente" que
+        # manda este job), no tocamos nada. Esto evita el doble mail
+        # contradictorio que recibían los pacientes con monitoreo perfecto.
+        if p.get("ultimo_pdf_enviado_at") or p.get("mail_expiracion_enviado_at"):
+            saltados += 1
+            continue
+
+        # Caso 1: ya terminó el protocolo (28 tomas) → lo resuelve la app
         if total >= 28:
             saltados += 1
             continue
 
-        inicio = fecha_inicio(mediciones)
-        # Caso 2: nunca empezó el protocolo → siempre mandar recordatorio para que arranque
-        if inicio is None:
+        # Caso 2: nunca empezó el protocolo → recordatorio para que arranque
+        if not ev["tiene_tomas"]:
             try:
                 resend.Emails.send({
                     "from": "Arteris <noreply@arterismed.com>",
                     "to": email,
                     "subject": "Recordatorio · Cargá tu presión arterial en Arteris",
-                    "html": html_recordatorio(nombre),
+                    "html": html_recordatorio(nombre, p.get("session_token")),
                 })
                 enviados_recordatorio += 1
             except Exception as e:
                 print(f"Error con {email}: {e}")
             continue
 
-        # Calcular cuántos días pasaron desde la primera toma
-        dias_desde_inicio = (hoy - inicio).days  # 0 = mismo día, 6 = día 7
-        dia_actual = dias_desde_inicio + 1
-        expirado = dias_desde_inicio >= 7
+        # Caso 3: el monitoreo CONCLUYÓ con éxito (>=12 tomas válidas en la
+        # ventana, descartando el día 1). El PDF lo envía la app en tiempo
+        # real; el job NO manda nada para no contradecirlo.
+        if ev["concluido"]:
+            saltados += 1
+            continue
+
+        # A partir de acá hay tomas pero NO se alcanzó el mínimo clínico.
+        dia_actual = ev["dia_actual"]
+        expirado = ev["expirado"]
         # Mismo cálculo de abandono que la app: A) imposibilidad matemática + B) adherencia
         dias_restantes = max(0, 7 - dia_actual + 1)
         max_posible = total + 4 * dias_restantes
@@ -180,30 +198,29 @@ def main():
         abandono_adherencia = (dia_actual >= 4) and (total < dia_actual)
         abandonado = (abandono_matematico or abandono_adherencia) and not expirado
 
-        # Caso 3: protocolo expirado o abandonado → mail final UNA SOLA VEZ
+        # Caso 4: protocolo expirado o abandonado SIN llegar al mínimo →
+        # mail final de "insuficiente" UNA SOLA VEZ (único camino restante;
+        # la guarda de exclusión mutua de arriba garantiza que no se duplique).
         if expirado or abandonado:
-            ya_enviado = bool(p.get("mail_expiracion_enviado_at"))
-            if not ya_enviado:
-                try:
-                    motivo = "abandonado" if (abandonado and not expirado) else "expirado"
-                    resend.Emails.send({
-                        "from": "Arteris <noreply@arterismed.com>",
-                        "to": email,
-                        "subject": "Tu monitoreo HBPM finalizó · Arteris",
-                        "html": html_mail_final(nombre, motivo),
-                    })
-                    enviados_final += 1
-                    # Marcar como enviado
-                    sb.table("pacientes").update({
-                        "mail_expiracion_enviado_at": now_arg_iso(),
-                    }).eq("codigo", codigo).execute()
-                except Exception as e:
-                    print(f"Error mail final {email}: {e}")
-            else:
-                saltados += 1
+            try:
+                motivo = "abandonado" if (abandonado and not expirado) else "expirado"
+                resend.Emails.send({
+                    "from": "Arteris <noreply@arterismed.com>",
+                    "to": email,
+                    "subject": "Tu monitoreo HBPM finalizó · Arteris",
+                    "html": html_mail_final(nombre, motivo),
+                })
+                enviados_final += 1
+                # Marcar como enviado
+                sb.table("pacientes").update({
+                    "mail_expiracion_enviado_at": now_arg_iso(),
+                }).eq("codigo", codigo).execute()
+            except Exception as e:
+                print(f"Error mail final {email}: {e}")
             continue
 
-        # Caso 4: protocolo activo (días 1-7) → recordatorio normal
+        # Caso 5: protocolo activo (días 1-7), todavía puede llegar al mínimo →
+        # recordatorio normal
         try:
             resend.Emails.send({
                 "from": "Arteris <noreply@arterismed.com>",

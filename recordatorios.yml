@@ -2,12 +2,12 @@ name: Recordatorios HBPM
 
 # Envía los recordatorios de carga de presión arterial dos veces por día.
 # Los horarios están en UTC. Argentina = UTC-3.
-#   10:00 UTC  ->  07:00 hs (Argentina)
-#   22:00 UTC  ->  19:00 hs (Argentina)
+#   09:00 UTC  ->  06:00 hs (Argentina)   <- recordatorio de la mañana
+#   22:00 UTC  ->  19:00 hs (Argentina)   <- recordatorio de la tarde/noche
 
 on:
   schedule:
-    - cron: '0 10 * * *'
+    - cron: '0 9 * * *'
     - cron: '0 22 * * *'
   workflow_dispatch:   # permite ejecutarlo manualmente desde la pestaña Actions
 

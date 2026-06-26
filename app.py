@@ -11,6 +11,7 @@ import hashlib
 import bcrypt
 import pandas as pd
 import altair as alt
+from evaluar_hbpm import evaluar_hbpm   # fuente única de verdad de "monitoreo concluido"
 
 # ── Helpers de medicación múltiple ────────────────────────────────────────────
 def parse_medicaciones(paciente):
@@ -451,7 +452,8 @@ def guardar_medicion(codigo, sistolica, diastolica, momento, pulso=None, fecha_d
             # Envío automático del PDF (una sola vez por procedimiento)
             try:
                 p = buscar_paciente(codigo)
-                if p and not p.get("ultimo_pdf_enviado_at") and p.get("email"):
+                if (p and not p.get("ultimo_pdf_enviado_at") and p.get("email")
+                        and evaluar_hbpm(meds)["concluido"]):
                     eventos = obtener_eventos_adversos(codigo)
                     alertas = obtener_alertas(codigo)
                     pdf_bytes = generar_pdf_hbpm(p, meds, res, eventos, alertas)
@@ -1538,6 +1540,7 @@ def generar_pdf_hbpm(paciente, mediciones, resultado, eventos, alertas):
 params = st.query_params
 codigo_url = params.get("codigo", "")
 vista_url = params.get("vista", "")
+token_url = params.get("token", "")   # auto-login desde el link del mail recordatorio
 
 if "vista" not in st.session_state:
     if codigo_url:
@@ -1595,20 +1598,22 @@ def _ls_save(token):
         pass
 
 def _ls_read():
-    """Lee token de localStorage del navegador via JS. Devuelve None si no hay
-    o si todavía no respondió (primer render)."""
+    """Lee el token de localStorage. Devuelve el token (str no vacío), '' si
+    localStorage respondió y está vacío, o None si el componente todavía no
+    respondió (primer render). Distinguir 'vacío' de 'pendiente' evita que el
+    arranque se rinda antes de que el navegador conteste."""
     if not _SJ_OK:
-        return None
+        return ''
     try:
         val = st_javascript(
             "localStorage.getItem('arteris_session') || ''",
             key="_ls_read_session",
         )
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-        return None
+        if isinstance(val, str):
+            return val.strip()      # token o '' (respondió)
+        return None                  # 0/None → todavía pendiente
     except Exception:
-        return None
+        return ''
 
 def _ls_clear():
     """Borra el token del localStorage."""
@@ -1649,33 +1654,73 @@ def clear_session_cookie():
             except Exception:
                 pass
 
-def leer_session_cookie():
-    """Lee el token primero de localStorage, luego de cookie como fallback."""
-    tok = _ls_read()
-    if tok:
-        return tok
+def _leer_token_navegador():
+    """Lee el token de sesión del navegador de la forma más confiable posible.
+    Devuelve (token, pendiente):
+      - token: str con el token de sesión, o '' si no hay.
+      - pendiente: True si un método asíncrono (localStorage) todavía no
+        respondió y conviene reintentar el render.
+
+    Orden de preferencia:
+      1) st.context.cookies — lee la cookie del header HTTP de forma SÍNCRONA,
+         sin round-trip de JS. Es lo más robusto y ya funciona en el primer
+         render (clave para no pedir login en cada visita).
+      2) cookie_controller (componente JS) — fallback.
+      3) localStorage (st_javascript) — fallback.
+    """
+    # 1) Cookie por header HTTP (sin race) — Streamlit >= 1.37
+    try:
+        c = st.context.cookies.get("arteris_session")
+        if c:
+            return c, False
+    except Exception:
+        pass
+    # 2) Cookie controller (componente JS)
     if cookie_controller is not None:
         try:
-            return cookie_controller.get("arteris_session")
+            c = cookie_controller.get("arteris_session")
+            if c:
+                return c, False
         except Exception:
-            return None
-    return None
+            pass
+    # 3) localStorage (componente JS) — tri-estado
+    val = _ls_read()
+    if val:
+        return val, False
+    if val is None:
+        return '', True   # todavía pendiente
+    return '', False
+
+def leer_session_cookie():
+    """Compat: devuelve un token del navegador o None."""
+    tok, _pendiente = _leer_token_navegador()
+    return tok or None
 
 def iniciar_sesion_persistente(tipo, ident):
-    """Crea un token de sesión en DB y lo guarda en localStorage + cookie (30 días)."""
-    expires = now_arg() + timedelta(days=30)
+    """Crea la sesión en DB y la transporta por la URL (?token=) para que el
+    bloque de persistencia la escriba en el navegador con un ciclo de render
+    COMPLETO. Antes se escribía localStorage/cookie acá mismo, pero el
+    st.rerun() que el login hace a continuación destruía el componente JS de
+    escritura y el token nunca quedaba guardado → re-login en cada visita."""
     token = None
     if tipo == "paciente":
         token = crear_session_paciente(ident)
     elif tipo == "medico":
         token = crear_session_medico(ident)
     if token:
-        set_session_cookie(token, expires)
+        try:
+            st.query_params["token"] = token
+        except Exception:
+            pass
+    return token
 
-# Restaurar sesión si todavía no hay rol cargado.
-# Damos hasta 3 reruns para que localStorage / cookies estén listos.
+# ── Restaurar sesión si todavía no hay rol cargado ────────────────────────────
 if not st.session_state.get("rol"):
-    tok_persistente = leer_session_cookie()
+    # El token de la URL (login o link del mail) tiene prioridad sobre la cookie.
+    if token_url:
+        tok_persistente, _pendiente = token_url, False
+    else:
+        tok_persistente, _pendiente = _leer_token_navegador()
     if tok_persistente:
         tipo, registro = validar_session(tok_persistente)
         if registro:
@@ -1688,11 +1733,27 @@ if not st.session_state.get("rol"):
                 st.session_state.medico_data = registro
                 st.session_state.rol = "medico"
                 st.session_state.vista = "medico_home"
-    else:
+    elif _pendiente:
+        # localStorage todavía no respondió: reintentar unas pocas veces.
         retries = int(st.session_state.get("_persist_retry", 0) or 0)
-        if retries < 3:
+        if retries < 5:
             st.session_state["_persist_retry"] = retries + 1
             st.rerun()
+
+# ── Persistir en el navegador el token que llegó por URL (login o mail) ───────
+# Corre SIEMPRE (no depende de rol) y completa el render sin un st.rerun()
+# destructivo, así el componente JS de escritura alcanza a ejecutarse y el
+# token queda guardado de verdad (cookie + localStorage, 30 días). Después
+# saca el token de la barra de direcciones.
+if token_url:
+    try:
+        set_session_cookie(token_url, now_arg() + timedelta(days=30))
+    except Exception:
+        pass
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
 
 def cerrar_sesion():
     """Cierra sesión: invalida token en DB + borra localStorage + cookie + session_state."""
@@ -2731,7 +2792,9 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                         pdf_bytes = None
 
                     # Si no llegó a enviarse el PDF en su momento, lo enviamos ahora
-                    if pdf_bytes and not paciente.get("ultimo_pdf_enviado_at") and paciente.get("email"):
+                    # (gateado por la fuente única de verdad: solo si concluyó de verdad)
+                    if (pdf_bytes and not paciente.get("ultimo_pdf_enviado_at") and paciente.get("email")
+                            and evaluar_hbpm(mediciones)["concluido"]):
                         try:
                             if enviar_pdf_informe(paciente.get("email"), paciente.get("nombre", ""), pdf_bytes):
                                 actualizar_paciente(codigo, {"ultimo_pdf_enviado_at": now_arg().isoformat()})

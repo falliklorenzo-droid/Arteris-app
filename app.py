@@ -11,6 +11,7 @@ import hashlib
 import bcrypt
 import pandas as pd
 import altair as alt
+import streamlit.components.v1 as components
 from evaluar_hbpm import evaluar_hbpm   # fuente única de verdad de "monitoreo concluido"
 
 # ── Helpers de medicación múltiple ────────────────────────────────────────────
@@ -1627,14 +1628,43 @@ def _ls_clear():
     except Exception:
         pass
 
+def _escribir_cookie_origen_principal(token, max_age):
+    """Escribe la cookie en el ORIGEN PRINCIPAL de la app, no en el del iframe.
+
+    Los componentes JS de Streamlit (cookie_controller, st_javascript) corren
+    dentro de un iframe; si escriben document.cookie, la cookie queda en el
+    origen del iframe y `st.context.cookies` (que lee del origen principal)
+    NUNCA la ve → re-login en cada visita. `components.html` usa un iframe
+    `srcdoc`, que es del mismo origen que la página, así que desde ahí
+    `window.parent.document.cookie` escribe la cookie en el dominio real."""
+    try:
+        components.html(
+            """
+            <script>
+            (function() {
+              var c = "arteris_session=__TOKEN__; path=/; max-age=__MAXAGE__; SameSite=Lax";
+              try { window.parent.document.cookie = c; } catch (e) { document.cookie = c; }
+            })();
+            </script>
+            """.replace("__TOKEN__", str(token)).replace("__MAXAGE__", str(int(max_age))),
+            height=0,
+        )
+    except Exception:
+        pass
+
 def set_session_cookie(token, expires):
-    """Guarda el token de sesión en localStorage Y cookie (doble redundancia)."""
+    """Guarda el token de sesión como cookie en el origen principal (método
+    confiable) + localStorage y cookie_controller como respaldo."""
     if not token:
         return
+    try:
+        max_age = int((expires - now_arg()).total_seconds())
+    except Exception:
+        max_age = 30 * 24 * 3600
+    _escribir_cookie_origen_principal(token, max_age)
     _ls_save(token)
     if cookie_controller is not None:
         try:
-            max_age = int((expires - now_arg()).total_seconds())
             cookie_controller.set("arteris_session", token, max_age=max_age, path="/", same_site="lax")
         except Exception:
             try:
@@ -1643,7 +1673,8 @@ def set_session_cookie(token, expires):
                 pass
 
 def clear_session_cookie():
-    """Borra el token de localStorage Y cookie."""
+    """Borra el token de localStorage Y cookie (origen principal + respaldo)."""
+    _escribir_cookie_origen_principal("", 0)   # max-age=0 → expira la cookie ya
     _ls_clear()
     if cookie_controller is not None:
         try:
@@ -1754,6 +1785,34 @@ if token_url:
         st.query_params.clear()
     except Exception:
         pass
+
+# ── Panel de diagnóstico de sesión (solo con ?debug=1) ───────────────────────
+# No expone el token; solo dice SI está presente cada mecanismo. Sirve para
+# saber dónde se rompe la persistencia del login. Quitar cuando esté resuelto.
+if params.get("debug") == "1":
+    import streamlit as _st
+    try:
+        _ctx_cookie = st.context.cookies.get("arteris_session")
+        _ctx_ok = True
+    except Exception as _e:
+        _ctx_cookie = None
+        _ctx_ok = f"ERROR: {_e}"
+    try:
+        _tok_nav, _pend = _leer_token_navegador()
+    except Exception as _e:
+        _tok_nav, _pend = f"ERROR: {_e}", None
+    _st.warning("🔧 DIAGNÓSTICO DE SESIÓN (ocultá esto sacando ?debug=1)")
+    _st.json({
+        "streamlit_version": _st.__version__,
+        "st.context.cookies_accesible": _ctx_ok,
+        "cookie_en_header_presente": bool(_ctx_cookie),
+        "token_url_presente": bool(token_url),
+        "streamlit_javascript_ok": _SJ_OK,
+        "cookie_controller_ok": cookie_controller is not None,
+        "leer_token_navegador_presente": bool(_tok_nav) and not str(_tok_nav).startswith("ERROR"),
+        "leer_token_navegador_pendiente": _pend,
+        "rol_en_sesion": st.session_state.get("rol"),
+    })
 
 def cerrar_sesion():
     """Cierra sesión: invalida token en DB + borra localStorage + cookie + session_state."""

@@ -199,13 +199,15 @@ section[data-testid="stSidebar"] { display: none; }
 .logo-tag { font-size: 11px; color: #8896a8; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; line-height: 1; }
 /* Barra de header con controles (vista paciente) */
 .header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
-/* Botones del header más chicos y del mismo tamaño */
+/* Botones del header más chicos y del mismo tamaño (sin partir el texto en 2 líneas) */
 [data-testid="stPopover"] > button, .st-key-header_cerrar button {
-    font-size: 14px !important; font-weight: 500 !important;
-    padding: 0.4rem 0.7rem !important; min-height: 0 !important;
+    font-size: 13px !important; font-weight: 500 !important;
+    padding: 0.3rem 0.5rem !important; min-height: 0 !important; white-space: nowrap !important;
 }
 [data-testid="stPopover"] > button p, .st-key-header_cerrar button p,
-[data-testid="stPopover"] > button span, .st-key-header_cerrar button span { font-size: 14px !important; }
+[data-testid="stPopover"] > button span, .st-key-header_cerrar button span {
+    font-size: 13px !important; white-space: nowrap !important;
+}
 
 /* Cards */
 .art-card {
@@ -293,8 +295,11 @@ section[data-testid="stSidebar"] { display: none; }
 }
 /* Enlace "¿Olvidaste tu contraseña?" pegado debajo del campo */
 .st-key-link_olvide, .st-key-link_olvide_med { margin-top: -14px !important; margin-bottom: 2px !important; }
-.st-key-link_olvide button, .st-key-link_olvide_med button {
-    background: transparent !important; border: none !important; box-shadow: none !important;
+.st-key-link_olvide button, .st-key-link_olvide_med button,
+.st-key-link_olvide button:hover, .st-key-link_olvide_med button:hover,
+.st-key-link_olvide button:focus, .st-key-link_olvide_med button:focus,
+.st-key-link_olvide button:active, .st-key-link_olvide_med button:active {
+    background: transparent !important; border: 0 !important; box-shadow: none !important; outline: none !important;
     color: #2563eb !important; text-decoration: underline !important;
     font-size: 12px !important; font-weight: 500 !important;
     padding: 2px 0 !important; width: auto !important; min-height: 0 !important;
@@ -381,18 +386,17 @@ header { visibility: hidden; }
 
 # ── Componentes UI ────────────────────────────────────────────────────────────
 def logo_markup():
+    # Logo como un único SVG: el ícono (izquierda) y los dos textos quedan alineados
+    # por coordenadas exactas → el alto del ícono es igual al alto de los dos textos.
     return """
-    <div class="logo-wrap">
-        <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
-          <rect width="42" height="42" rx="10" fill="#1e3a8a"/>
-          <path d="M5 23 L10 23 L14 14 L18 30 L21 10 L24 25 L27 18 L31 23 L37 23"
-                stroke="#ef4444" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        </svg>
-        <div class="logo-textblock">
-            <div class="logo-text">Arteri<span>s</span></div>
-            <div class="logo-tag">Monitoreo Domiciliario de Presión Arterial</div>
-        </div>
-    </div>
+    <svg viewBox="0 0 342 56" width="342" height="56" xmlns="http://www.w3.org/2000/svg"
+         style="height:44px;width:auto;max-width:100%;display:block;" role="img" aria-label="Arteris — Monitoreo Domiciliario de Presión Arterial">
+      <rect x="4" y="10" width="36" height="36" rx="9" fill="#1e3a8a"/>
+      <path d="M8 29 L12 29 L16 21 L20 37 L23 16 L26 32 L29 24 L33 29 L38 29"
+            stroke="#ef4444" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <text x="52" y="31" font-family="'DM Serif Display',Georgia,serif" font-size="28" fill="#16233b">Arteri<tspan fill="#dc2626">s</tspan></text>
+      <text x="53" y="45" font-family="'DM Sans',Arial,sans-serif" font-size="9.5" letter-spacing="1.1" fill="#8896a8">MONITOREO DOMICILIARIO DE PRESIÓN ARTERIAL</text>
+    </svg>
     """
 
 def navbar(subtitulo=""):
@@ -2573,7 +2577,7 @@ elif st.session_state.vista == "paciente_login":
             email_input = st.text_input("Email", placeholder="tu@email.com", key="uni_email")
             pwd_input = st.text_input("Contraseña", type="password", key="uni_pwd")
             # "¿Olvidaste tu contraseña?" pegado justo debajo del campo de contraseña
-            if st.button("¿Olvidaste tu contraseña?", key="link_olvide"):
+            if st.button("¿Olvidaste tu contraseña?", key="link_olvide", type="tertiary"):
                 st.session_state.mostrar_reset = not st.session_state.get("mostrar_reset", False)
             login_ok = st.button("Ingresar →", use_container_width=True, key="btn_login_uni")
             if login_ok:
@@ -2648,7 +2652,7 @@ elif st.session_state.vista == "paciente_home":
     nombre = paciente.get("nombre", "Paciente")
 
     # Header en una sola barra: logo + Mi cuenta + Cerrar sesión
-    h_logo, h_tools, h_logout = st.columns([7, 1.35, 1.35], vertical_alignment="center")
+    h_logo, h_tools, h_logout = st.columns([7, 1.6, 1.6], vertical_alignment="center")
     with h_logo:
         st.markdown(logo_markup(), unsafe_allow_html=True)
     with h_tools:
@@ -2866,17 +2870,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
           </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # Aclaración: si olvidó una toma, puede seguir (mínimo 12 tomas válidas para el informe)
-        if not cerrado:
-            st.markdown(
-                '<div style="background:#eaf1fb;border-left:4px solid #2563eb;border-radius:8px;'
-                'padding:10px 14px;margin-bottom:1rem;font-size:15px;color:#16233b;line-height:1.5;">'
-                'ℹ️ Si algún día olvidaste tomarte la presión, no pasa nada: continuá con los días siguientes. '
-                'Con un <strong>mínimo de 12 tomas válidas</strong> alcanza para generar tu informe.'
-                '</div>',
-                unsafe_allow_html=True,
-            )
 
         # Aviso si la data tiene tomas fuera del protocolo de 7 días (datos viejos con bug)
         try:
@@ -3284,6 +3277,15 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     '<div class="tomas-wrap">' + _caja_toma("tarde-1") + _caja_toma("tarde-2") + '</div>',
                     unsafe_allow_html=True,
                 )
+            # Aclaración: si olvidó una toma, puede seguir (mínimo 12 tomas válidas para el informe)
+            st.markdown(
+                '<div style="background:#eaf1fb;border-left:4px solid #2563eb;border-radius:8px;'
+                'padding:10px 14px;margin:12px 0 1rem;font-size:15px;color:#16233b;line-height:1.5;">'
+                'ℹ️ Si algún día olvidaste tomarte la presión, no pasa nada: continuá con los días siguientes. '
+                'Con un <strong>mínimo de 12 tomas válidas</strong> alcanza para generar tu informe.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
 
         # Editor de tomas del día (editables solo si <12hs)
         if med_dia:
@@ -3402,7 +3404,7 @@ elif st.session_state.vista == "medico_login":
         if True:
             email_m = st.text_input("Email médico", key="med_email")
             pwd_m = st.text_input("Contraseña", type="password", key="med_pwd")
-            if st.button("¿Olvidaste tu contraseña?", key="link_olvide_med"):
+            if st.button("¿Olvidaste tu contraseña?", key="link_olvide_med", type="tertiary"):
                 st.session_state.mostrar_reset_med = not st.session_state.get("mostrar_reset_med", False)
             login_m = st.button("Ingresar →", use_container_width=True, key="btn_login_med")
             if login_m:

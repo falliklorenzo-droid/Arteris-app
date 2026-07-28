@@ -192,9 +192,11 @@ section[data-testid="stSidebar"] { display: none; }
     background: linear-gradient(90deg, #1e3a8a, #2563eb, #dc2626, transparent);
 }
 .logo-wrap { display: flex; align-items: center; gap: 12px; }
-.logo-text { font-family: 'DM Serif Display', serif; font-size: 30px !important; color: #16233b; letter-spacing: -0.5px; line-height: 1; }
+.logo-text { font-family: 'DM Serif Display', serif; font-size: 30px !important; color: #16233b; letter-spacing: -0.5px; line-height: 1.05; }
 .logo-text span { color: #dc2626; font-size: 30px !important; font-family: 'DM Serif Display', serif !important; }
-.logo-tag { font-size: 12px; color: #8896a8; letter-spacing: 1.4px; text-transform: uppercase; margin-top: 3px; }
+.logo-tag { font-size: 12px; color: #8896a8; letter-spacing: 1.4px; text-transform: uppercase; margin-top: 3px; line-height: 1.1; }
+/* Barra de header con controles (vista paciente) */
+.header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
 
 /* Cards */
 .art-card {
@@ -270,6 +272,17 @@ section[data-testid="stSidebar"] { display: none; }
     border: 1px solid #cbd5e1 !important;
 }
 .stButton > button[kind="secondary"]:hover { background:#f1f5f9 !important; color:#16307a !important; }
+/* Enlace "¿Olvidaste tu contraseña?" pegado debajo del campo */
+.st-key-link_olvide, .st-key-link_olvide_med { margin-top: -14px !important; margin-bottom: 2px !important; }
+.st-key-link_olvide button, .st-key-link_olvide_med button {
+    background: transparent !important; border: none !important; box-shadow: none !important;
+    color: #2563eb !important; text-decoration: underline !important;
+    font-size: 15px !important; font-weight: 500 !important;
+    padding: 2px 0 !important; width: auto !important; min-height: 0 !important;
+}
+.st-key-link_olvide button:hover, .st-key-link_olvide_med button:hover {
+    background: transparent !important; color: #16307a !important;
+}
 
 /* Progress */
 .art-progress-wrap { background: #e2e8f0; border-radius: 4px; height: 9px; overflow: hidden; margin: 8px 0; }
@@ -340,23 +353,27 @@ header { visibility: hidden; }
 """, unsafe_allow_html=True)
 
 # ── Componentes UI ────────────────────────────────────────────────────────────
-def navbar(subtitulo=""):
-    st.markdown(f"""
-    <div class="arteris-nav">
-        <div class="logo-wrap">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              <rect width="36" height="36" rx="9" fill="#1e3a8a"/>
-              <path d="M4 20 L9 20 L12 13 L15 25 L18 9 L21 22 L24 16 L27 20 L32 20"
-                    stroke="#ef4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            </svg>
-            <div style="display:flex;flex-direction:column;justify-content:center;line-height:1.2;">
-                <div class="logo-text" style="margin:0;padding:0;">Arteri<span>s</span></div>
-                <div class="logo-tag" style="margin:0;padding:0;">Monitoreo Domiciliario de Presión Arterial</div>
-            </div>
+def logo_markup():
+    return """
+    <div class="logo-wrap">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="display:block;flex-shrink:0;">
+          <rect width="40" height="40" rx="10" fill="#1e3a8a"/>
+          <path d="M5 22 L10 22 L13 14 L17 28 L20 10 L23 24 L26 18 L29 22 L35 22"
+                stroke="#ef4444" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div style="display:flex;flex-direction:column;justify-content:center;">
+            <div class="logo-text">Arteri<span>s</span></div>
+            <div class="logo-tag">Monitoreo Domiciliario de Presión Arterial</div>
         </div>
-        <div style="font-size:16px;color:#5a6b82;">{subtitulo}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """
+
+def navbar(subtitulo=""):
+    st.markdown(
+        f'<div class="arteris-nav">{logo_markup()}'
+        f'<div style="font-size:16px;color:#5a6b82;">{subtitulo}</div></div>',
+        unsafe_allow_html=True,
+    )
 
 def footer():
     st.markdown(f"""
@@ -2211,9 +2228,7 @@ if st.session_state.vista == "inicio":
             if st.button("Ingresar →", use_container_width=True, key="btn_ingresar_home"):
                 st.session_state.vista = "paciente_login"
                 st.rerun()
-        st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
-        col_m1, col_m2 = st.columns([1, 1])
-        with col_m1:
+        with col_b:
             if st.button("Acceso médico", use_container_width=True, type="secondary", key="btn_acceso_medico"):
                 st.session_state.vista = "medico_login"
                 st.rerun()
@@ -2230,15 +2245,15 @@ if st.session_state.vista == "inicio":
             <div style="font-size:11px;color:#5a6b82;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">¿Cómo funciona?</div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <div style="display:flex;gap:12px;align-items:flex-start;">
-                    <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">1</div>
+                    <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;">1</div>
                     <div><div style="font-size:14px;color:#16233b;font-weight:500;">Tu médico te envía el acceso</div><div style="font-size:12px;color:#5a6b82;margin-top:2px;">Recibís un email con tu enlace de activación</div></div>
                 </div>
                 <div style="display:flex;gap:12px;align-items:flex-start;">
-                    <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">2</div>
+                    <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;">2</div>
                     <div><div style="font-size:14px;color:#16233b;font-weight:500;">Creás tu contraseña</div><div style="font-size:12px;color:#5a6b82;margin-top:2px;">Activás tu cuenta y completás tus datos</div></div>
                 </div>
                 <div style="display:flex;gap:12px;align-items:flex-start;">
-                    <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">3</div>
+                    <div style="width:28px;height:28px;border-radius:50%;background:#1e3a8a;color:#ffffff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;">3</div>
                     <div><div style="font-size:14px;color:#16233b;font-weight:500;">Registrás tu presión 7 días</div><div style="font-size:12px;color:#5a6b82;margin-top:2px;">2 tomas mañana y tarde, resultado al final</div></div>
                 </div>
             </div>
@@ -2534,15 +2549,12 @@ elif st.session_state.vista == "paciente_login":
         else:
             # Login unificado: detecta paciente, médico o admin por email
             st.markdown('<div class="art-card"><h3 style="margin-top:0;">Ingresar a Arteris</h3>', unsafe_allow_html=True)
-            with st.form("form_login_unificado"):
-                email_input = st.text_input("Email", placeholder="tu@email.com")
-                pwd_input = st.text_input("Contraseña", type="password")
-                login_ok = st.form_submit_button("Ingresar →", use_container_width=True)
-            # "Olvidé mi contraseña" debajo del campo de contraseña
-            col_olv1, col_olv2 = st.columns([1, 1])
-            with col_olv1:
-                if st.button("¿Olvidaste tu contraseña?", key="link_olvide", type="secondary", use_container_width=True):
-                    st.session_state.mostrar_reset = not st.session_state.get("mostrar_reset", False)
+            email_input = st.text_input("Email", placeholder="tu@email.com", key="uni_email")
+            pwd_input = st.text_input("Contraseña", type="password", key="uni_pwd")
+            # "¿Olvidaste tu contraseña?" pegado justo debajo del campo de contraseña
+            if st.button("¿Olvidaste tu contraseña?", key="link_olvide"):
+                st.session_state.mostrar_reset = not st.session_state.get("mostrar_reset", False)
+            login_ok = st.button("Ingresar →", use_container_width=True, key="btn_login_uni")
             if login_ok:
                 email_norm = email_input.strip().lower()
                 admin_email = get_secret("admin", "email")
@@ -2613,11 +2625,12 @@ elif st.session_state.vista == "paciente_home":
 
     codigo = paciente["codigo"]
     nombre = paciente.get("nombre", "Paciente")
-    navbar()
 
-    # Controles de cuenta alineados a la derecha del header
-    col_nav1, col_nav2, col_nav3 = st.columns([5, 1.4, 1.4])
-    with col_nav2:
+    # Header en una sola barra: logo + Herramientas + Cerrar sesión
+    h_logo, h_tools, h_logout = st.columns([5, 1.8, 1.8], vertical_alignment="center")
+    with h_logo:
+        st.markdown(logo_markup(), unsafe_allow_html=True)
+    with h_tools:
         with st.popover("⚙️ Herramientas", use_container_width=True):
             st.markdown(f'<p style="font-size:13px;color:#5a6b82;margin-bottom:8px;">Sesión activa como<br><strong style="color:#16233b;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
             st.divider()
@@ -2627,9 +2640,10 @@ elif st.session_state.vista == "paciente_home":
             if st.button("📚 Historial", use_container_width=True, key="pop_home_historial"):
                 st.session_state.vista = "paciente_historial"
                 st.rerun()
-    with col_nav3:
+    with h_logout:
         if st.button("🚪 Cerrar sesión", use_container_width=True, key="header_cerrar"):
             cerrar_sesion()
+    st.markdown('<div class="header-underline"></div>', unsafe_allow_html=True)
 
     # Consentimiento
     if not paciente.get("consentimiento_aceptado") and not st.session_state.consentimiento_ok:
@@ -3173,9 +3187,9 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                                 st.error("No se pudo archivar el procedimiento. Probá de nuevo en unos segundos.")
 
         elif terminado_dia:
-            # Pop-up "Listo por hoy" una sola vez por día
+            # Pop-up "Listo por hoy" una sola vez por día (nunca junto con otro diálogo)
             _flag_dia = f"popup_dia_ok_{dia_actual}"
-            if not st.session_state.get(_flag_dia):
+            if st.session_state.get("popup_medir_visto") and not st.session_state.get(_flag_dia):
                 st.session_state[_flag_dia] = True
                 dialog_dia_ok(dia_actual)
             # Confirmación persistente breve
@@ -3196,7 +3210,7 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             # Pop-up "Completaste la mañana" una sola vez por día al pasar a la tarde
             if terminada_manana and es_tarde:
                 _flag_man = f"popup_manana_ok_{dia_actual}"
-                if not st.session_state.get(_flag_man):
+                if st.session_state.get("popup_medir_visto") and not st.session_state.get(_flag_man):
                     st.session_state[_flag_man] = True
                     dialog_manana_ok()
 
@@ -3356,14 +3370,11 @@ elif st.session_state.vista == "medico_login":
     with col2:
         st.markdown('<div class="art-card"><h3 style="margin-top:0;">👨‍⚕️ Acceso médico</h3>', unsafe_allow_html=True)
         if True:
-            with st.form("form_login_medico"):
-                email_m = st.text_input("Email médico")
-                pwd_m = st.text_input("Contraseña", type="password")
-                login_m = st.form_submit_button("Ingresar →", use_container_width=True)
-            col_om1, col_om2 = st.columns([1, 1])
-            with col_om1:
-                if st.button("¿Olvidaste tu contraseña?", key="link_olvide_med", type="secondary", use_container_width=True):
-                    st.session_state.mostrar_reset_med = not st.session_state.get("mostrar_reset_med", False)
+            email_m = st.text_input("Email médico", key="med_email")
+            pwd_m = st.text_input("Contraseña", type="password", key="med_pwd")
+            if st.button("¿Olvidaste tu contraseña?", key="link_olvide_med"):
+                st.session_state.mostrar_reset_med = not st.session_state.get("mostrar_reset_med", False)
+            login_m = st.button("Ingresar →", use_container_width=True, key="btn_login_med")
             if login_m:
                 admin_email = get_secret("admin", "email")
                 admin_pwd = get_secret("admin", "password")

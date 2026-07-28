@@ -191,12 +191,21 @@ section[data-testid="stSidebar"] { display: none; }
     height: 2px;
     background: linear-gradient(90deg, #1e3a8a, #2563eb, #dc2626, transparent);
 }
-.logo-wrap { display: flex; align-items: center; gap: 12px; }
-.logo-text { font-family: 'DM Serif Display', serif; font-size: 30px !important; color: #16233b; letter-spacing: -0.5px; line-height: 1.05; }
-.logo-text span { color: #dc2626; font-size: 30px !important; font-family: 'DM Serif Display', serif !important; }
-.logo-tag { font-size: 12px; color: #8896a8; letter-spacing: 1.4px; text-transform: uppercase; margin-top: 3px; line-height: 1.1; }
+.logo-wrap { display: flex; align-items: center; gap: 11px; }
+.logo-wrap svg { flex-shrink: 0; }
+.logo-textblock { display: flex; flex-direction: column; justify-content: center; }
+.logo-text { font-family: 'DM Serif Display', serif; font-size: 27px !important; color: #16233b; letter-spacing: -0.5px; line-height: 1; }
+.logo-text span { color: #dc2626; font-size: 27px !important; font-family: 'DM Serif Display', serif !important; }
+.logo-tag { font-size: 11px; color: #8896a8; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; line-height: 1; }
 /* Barra de header con controles (vista paciente) */
 .header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
+/* Botones del header más chicos y del mismo tamaño */
+[data-testid="stPopover"] > button, .st-key-header_cerrar button {
+    font-size: 14px !important; font-weight: 500 !important;
+    padding: 0.4rem 0.7rem !important; min-height: 0 !important;
+}
+[data-testid="stPopover"] > button p, .st-key-header_cerrar button p,
+[data-testid="stPopover"] > button span, .st-key-header_cerrar button span { font-size: 14px !important; }
 
 /* Cards */
 .art-card {
@@ -272,13 +281,27 @@ section[data-testid="stSidebar"] { display: none; }
     border: 1px solid #cbd5e1 !important;
 }
 .stButton > button[kind="secondary"]:hover { background:#f1f5f9 !important; color:#16307a !important; }
+/* El texto interno de los botones hereda color/tamaño del botón
+   (evita que las reglas globales de markdown pisen el color/tamaño y dejen texto oscuro o gigante) */
+.stButton > button p, .stButton > button div, .stButton > button span, .stButton > button label,
+.stDownloadButton > button p, .stDownloadButton > button div, .stDownloadButton > button span,
+.stFormSubmitButton > button p, .stFormSubmitButton > button div, .stFormSubmitButton > button span,
+[data-testid="stPopover"] button p, [data-testid="stPopover"] button div, [data-testid="stPopover"] button span {
+    color: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+}
 /* Enlace "¿Olvidaste tu contraseña?" pegado debajo del campo */
 .st-key-link_olvide, .st-key-link_olvide_med { margin-top: -14px !important; margin-bottom: 2px !important; }
 .st-key-link_olvide button, .st-key-link_olvide_med button {
     background: transparent !important; border: none !important; box-shadow: none !important;
     color: #2563eb !important; text-decoration: underline !important;
-    font-size: 15px !important; font-weight: 500 !important;
+    font-size: 12px !important; font-weight: 500 !important;
     padding: 2px 0 !important; width: auto !important; min-height: 0 !important;
+}
+.st-key-link_olvide button p, .st-key-link_olvide button span,
+.st-key-link_olvide_med button p, .st-key-link_olvide_med button span {
+    font-size: 12px !important; color: #2563eb !important;
 }
 .st-key-link_olvide button:hover, .st-key-link_olvide_med button:hover {
     background: transparent !important; color: #16307a !important;
@@ -313,6 +336,10 @@ section[data-testid="stSidebar"] { display: none; }
 .toma-val { font-family:'DM Serif Display', serif; font-size:30px; color:#16233b; line-height:1; }
 .toma-val small { font-size:15px; color:#8896a8; font-family:'DM Sans',sans-serif; }
 .toma-slot-title { font-size:15px; font-weight:600; color:#1e3a8a; text-transform:uppercase; letter-spacing:1px; margin:4px 0 8px; }
+.toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:12px; font-weight:600; padding:4px 11px; border-radius:20px; white-space:nowrap; }
+.toma-pend { font-size:13px; color:#8896a8; }
+/* Recuadro destacado de carga de medición (entre progreso y tomas) */
+.st-key-zona_toma { background:#eef4ff !important; border:2px solid #93b4f5 !important; border-radius:16px !important; padding:6px 4px !important; }
 
 /* Footer */
 .arteris-footer {
@@ -356,12 +383,12 @@ header { visibility: hidden; }
 def logo_markup():
     return """
     <div class="logo-wrap">
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="display:block;flex-shrink:0;">
-          <rect width="40" height="40" rx="10" fill="#1e3a8a"/>
-          <path d="M5 22 L10 22 L13 14 L17 28 L20 10 L23 24 L26 18 L29 22 L35 22"
+        <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+          <rect width="42" height="42" rx="10" fill="#1e3a8a"/>
+          <path d="M5 23 L10 23 L14 14 L18 30 L21 10 L24 25 L27 18 L31 23 L37 23"
                 stroke="#ef4444" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
         </svg>
-        <div style="display:flex;flex-direction:column;justify-content:center;">
+        <div class="logo-textblock">
             <div class="logo-text">Arteri<span>s</span></div>
             <div class="logo-tag">Monitoreo Domiciliario de Presión Arterial</div>
         </div>
@@ -530,18 +557,14 @@ SVG_MEDICION = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 524" 
 def dialog_como_medir():
     _svg_b64 = base64.b64encode(SVG_MEDICION.encode("utf-8")).decode("ascii")
     st.markdown(
-        f'<div style="text-align:center;"><img src="data:image/svg+xml;base64,{_svg_b64}" '
-        f'style="width:100%;max-width:560px;height:auto;" alt="Forma apropiada de medir la presión"/></div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        """
+        f"""
 <div style="font-size:16px;color:#16233b;line-height:1.6;">
-<strong>🪑 Postura:</strong> sentado en una silla con respaldo (espalda apoyada), sin cruzar las piernas y con <strong>ambos pies apoyados en el piso</strong>. Apoyá el brazo sobre la mesa, con el <strong>brazo a la altura del corazón</strong>.<br><br>
-<strong>🩹 Manguito:</strong> colocalo sobre el brazo, <strong>2 cm por encima del pliegue del codo</strong>.<br><br>
-<strong>⏳ Antes de medir:</strong> reposá al menos <strong>3 minutos</strong>. En ayunas y <strong>antes de tomar la medicación</strong>. Con la <strong>vejiga vacía</strong>. No fumes ni tomes café o alcohol antes.<br><br>
-<strong>🤫 Durante la medición:</strong> no hables, no hagas fuerza y no te muevas.<br><br>
-<strong>📋 Registro:</strong> medí <strong>dos veces</strong>, esperando <strong>1 a 2 minutos entre cada toma</strong>, y registrá ambos resultados.
+  <div style="text-align:center;margin-bottom:18px;"><img src="data:image/svg+xml;base64,{_svg_b64}" style="width:100%;max-width:560px;height:auto;" alt="Forma apropiada de medir la presión"/></div>
+  <div style="margin-bottom:18px;"><strong>🪑 Postura:</strong> sentado en una silla con respaldo (espalda apoyada), sin cruzar las piernas y con <strong>ambos pies apoyados en el piso</strong>. Apoyá el brazo sobre la mesa, con el <strong>brazo a la altura del corazón</strong>.</div>
+  <div style="margin-bottom:18px;"><strong>🩹 Manguito:</strong> colocalo sobre el brazo, <strong>2 cm por encima del pliegue del codo</strong>.</div>
+  <div style="margin-bottom:18px;"><strong>⏳ Antes de medir:</strong> reposá al menos <strong>3 minutos</strong>. En ayunas y <strong>antes de tomar la medicación</strong>. Con la <strong>vejiga vacía</strong>. No fumes ni tomes café o alcohol antes.</div>
+  <div style="margin-bottom:18px;"><strong>🤫 Durante la medición:</strong> no hables, no hagas fuerza y no te muevas.</div>
+  <div style="margin-bottom:18px;"><strong>📋 Registro:</strong> medí <strong>dos veces</strong>, esperando <strong>1 a 2 minutos entre cada toma</strong>, y registrá ambos resultados.</div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -2297,38 +2320,36 @@ elif st.session_state.vista == "paciente_ajustes":
     col1, col2 = st.columns([1, 1], gap="large")
 
     with col1:
-        st.markdown('<div class="art-card">', unsafe_allow_html=True)
-        st.markdown("#### 📧 Recordatorios por email")
-        st.markdown('<p style="font-size:13px;color:#5a6b82;">Recibirás un recordatorio para cargar tu presión arterial a las 7 hs y a las 19 hs cada día.</p>', unsafe_allow_html=True)
-        recordatorios_actual = paciente.get("recordatorios_email", True)
-        nuevo_valor = st.toggle("Activar recordatorios por email", value=recordatorios_actual)
-        if nuevo_valor != recordatorios_actual:
-            actualizar_paciente(paciente["codigo"], {"recordatorios_email": nuevo_valor})
-            st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
-            st.success("✅ Preferencia guardada.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("#### 📧 Recordatorios por email")
+            st.markdown('<p style="font-size:13px;color:#5a6b82;">Recibirás un recordatorio para cargar tu presión arterial a las 7 hs y a las 19 hs cada día.</p>', unsafe_allow_html=True)
+            recordatorios_actual = paciente.get("recordatorios_email", True)
+            nuevo_valor = st.toggle("Activar recordatorios por email", value=recordatorios_actual)
+            if nuevo_valor != recordatorios_actual:
+                actualizar_paciente(paciente["codigo"], {"recordatorios_email": nuevo_valor})
+                st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
+                st.success("✅ Preferencia guardada.")
 
     with col2:
-        st.markdown('<div class="art-card">', unsafe_allow_html=True)
-        st.markdown("#### 🔐 Cambiar contraseña")
-        with st.form("form_cambiar_pwd"):
-            pwd_actual = st.text_input("Contraseña actual", type="password")
-            pwd_nueva = st.text_input("Nueva contraseña", type="password", placeholder="Mínimo 8 caracteres")
-            pwd_conf = st.text_input("Confirmá la nueva contraseña", type="password")
-            cambiar = st.form_submit_button("Cambiar contraseña", use_container_width=True)
-        if cambiar:
-            ok_actual, _ = verificar_password(pwd_actual, paciente.get("password_hash", ""))
-            if not ok_actual:
-                st.error("❌ La contraseña actual es incorrecta.")
-            elif len(pwd_nueva) < 8:
-                st.error("La nueva contraseña debe tener al menos 8 caracteres.")
-            elif pwd_nueva != pwd_conf:
-                st.error("Las contraseñas no coinciden.")
-            else:
-                actualizar_paciente(paciente["codigo"], {"password_hash": hash_password(pwd_nueva)})
-                st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
-                st.success("✅ Contraseña actualizada correctamente.")
-        st.markdown('</div>', unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("#### 🔐 Cambiar contraseña")
+            with st.form("form_cambiar_pwd"):
+                pwd_actual = st.text_input("Contraseña actual", type="password")
+                pwd_nueva = st.text_input("Nueva contraseña", type="password", placeholder="Mínimo 8 caracteres")
+                pwd_conf = st.text_input("Confirmá la nueva contraseña", type="password")
+                cambiar = st.form_submit_button("Cambiar contraseña", use_container_width=True)
+            if cambiar:
+                ok_actual, _ = verificar_password(pwd_actual, paciente.get("password_hash", ""))
+                if not ok_actual:
+                    st.error("❌ La contraseña actual es incorrecta.")
+                elif len(pwd_nueva) < 8:
+                    st.error("La nueva contraseña debe tener al menos 8 caracteres.")
+                elif pwd_nueva != pwd_conf:
+                    st.error("Las contraseñas no coinciden.")
+                else:
+                    actualizar_paciente(paciente["codigo"], {"password_hash": hash_password(pwd_nueva)})
+                    st.session_state.paciente_data = buscar_paciente(paciente["codigo"])
+                    st.success("✅ Contraseña actualizada correctamente.")
 
     st.markdown('<div class="art-card" style="margin-top:1rem;"><h4 style="margin-top:0;">💊 Mi medicación</h4>', unsafe_allow_html=True)
     st.markdown('<p style="font-size:13px;color:#5a6b82;margin-bottom:1rem;">Podés cargar varias medicaciones (con su dosis). Usá el botón "Agregar otra" para sumar más.</p>', unsafe_allow_html=True)
@@ -2626,12 +2647,12 @@ elif st.session_state.vista == "paciente_home":
     codigo = paciente["codigo"]
     nombre = paciente.get("nombre", "Paciente")
 
-    # Header en una sola barra: logo + Herramientas + Cerrar sesión
-    h_logo, h_tools, h_logout = st.columns([5, 1.8, 1.8], vertical_alignment="center")
+    # Header en una sola barra: logo + Mi cuenta + Cerrar sesión
+    h_logo, h_tools, h_logout = st.columns([7, 1.35, 1.35], vertical_alignment="center")
     with h_logo:
         st.markdown(logo_markup(), unsafe_allow_html=True)
     with h_tools:
-        with st.popover("⚙️ Herramientas", use_container_width=True):
+        with st.popover("⚙️ Mi cuenta", use_container_width=True):
             st.markdown(f'<p style="font-size:13px;color:#5a6b82;margin-bottom:8px;">Sesión activa como<br><strong style="color:#16233b;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
             st.divider()
             if st.button("⚙️ Ajustes", use_container_width=True, key="pop_home_ajustes"):
@@ -2641,7 +2662,7 @@ elif st.session_state.vista == "paciente_home":
                 st.session_state.vista = "paciente_historial"
                 st.rerun()
     with h_logout:
-        if st.button("🚪 Cerrar sesión", use_container_width=True, key="header_cerrar"):
+        if st.button("🚪 Cerrar sesión", use_container_width=True, type="secondary", key="header_cerrar"):
             cerrar_sesion()
     st.markdown('<div class="header-underline"></div>', unsafe_allow_html=True)
 
@@ -2813,21 +2834,14 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     f'<div class="toma-box done"><div>'
                     f'<div class="toma-label">{et}</div>'
                     f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>'
-                    f'</div><div style="font-size:20px;color:#c7d7f0;" title="Editable abajo con el lápiz">✎</div></div>'
+                    f'</div><div class="toma-check">✓ Completado</div></div>'
                 )
             return (
                 f'<div class="toma-box pending"><div>'
                 f'<div class="toma-label">{et}</div>'
                 f'<div class="toma-val">—/—</div>'
-                f'</div><div style="font-size:13px;color:#8896a8;">Pendiente</div></div>'
+                f'</div><div class="toma-pend">Pendiente</div></div>'
             )
-
-        bloque_tomas = (
-            '<div class="toma-slot-title">🌅 Tomas de la mañana</div>'
-            '<div class="tomas-wrap">' + _caja_toma("mañana-1") + _caja_toma("mañana-2") + '</div>'
-            '<div class="toma-slot-title" style="margin-top:16px;">🌇 Tomas de la tarde</div>'
-            '<div class="tomas-wrap">' + _caja_toma("tarde-1") + _caja_toma("tarde-2") + '</div>'
-        )
 
         # Tarjeta ÚNICA: título "Día N" + progreso + las 4 tomas
         st.markdown(f"""
@@ -2850,8 +2864,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             <div class="art-progress-wrap"><div class="art-progress-fill" style="width:{pct*100:.0f}%"></div></div>
             <div class="day-dots">{dias_html}</div>
           </div>
-          <hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0 14px;">
-          {bloque_tomas}
         </div>
         """, unsafe_allow_html=True)
 
@@ -3216,25 +3228,26 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
 
             momento_display = proxima.replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
             color_proxima = "#2563eb" if es_manana else "#f59e0b"
-            st.markdown(f"""
-            <div class="section-eyebrow">Próxima toma</div>
-            <div style="font-family:'DM Serif Display',serif;font-size:24px;color:{color_proxima};margin-bottom:1rem;">{momento_display}</div>
-            """, unsafe_allow_html=True)
-            if proxima in ["mañana-2", "tarde-2"]:
-                st.info("⏱ Esperá 1-2 minutos desde la toma anterior.")
-
-            with st.form("form_medicion"):
-                # Clave dinámica por toma → cada nueva toma arranca con los valores por defecto 120/80/80
-                _k = f"{dia_actual}_{proxima}"
-                col_f1, col_f2, col_f3 = st.columns(3)
-                with col_f1:
-                    sis = st.number_input("Sistólica (mayor)", min_value=60, max_value=250, value=120, step=1, key=f"med_sis_{_k}")
-                with col_f2:
-                    dia = st.number_input("Diastólica (menor)", min_value=40, max_value=150, value=80, step=1, key=f"med_dia_{_k}")
-                with col_f3:
-                    pulso = st.number_input("Frecuencia cardíaca (lpm)", min_value=30, max_value=220, value=80, step=1, key=f"med_fc_{_k}", help="Frecuencia cardíaca (latidos por minuto) que muestra tu tensiómetro")
-                confirmar_alto = st.checkbox("Confirmo que los valores son correctos (requerido si son muy elevados)")
-                guardar_btn = st.form_submit_button("Guardar medición →", use_container_width=True)
+            with st.container(border=True, key="zona_toma"):
+                st.markdown(
+                    f'<div class="section-eyebrow" style="margin-bottom:2px;">Cargar tu próxima toma</div>'
+                    f'<div style="font-family:\'DM Serif Display\',serif;font-size:24px;color:{color_proxima};margin-bottom:10px;">{momento_display}</div>',
+                    unsafe_allow_html=True,
+                )
+                if proxima in ["mañana-2", "tarde-2"]:
+                    st.info("⏱ Esperá 1-2 minutos desde la toma anterior.")
+                with st.form("form_medicion"):
+                    # Clave dinámica por toma → cada nueva toma arranca con los valores por defecto 120/80/80
+                    _k = f"{dia_actual}_{proxima}"
+                    col_f1, col_f2, col_f3 = st.columns(3)
+                    with col_f1:
+                        sis = st.number_input("Sistólica (mayor)", min_value=60, max_value=250, value=120, step=1, key=f"med_sis_{_k}")
+                    with col_f2:
+                        dia = st.number_input("Diastólica (menor)", min_value=40, max_value=150, value=80, step=1, key=f"med_dia_{_k}")
+                    with col_f3:
+                        pulso = st.number_input("Frecuencia cardíaca (lpm)", min_value=30, max_value=220, value=80, step=1, key=f"med_fc_{_k}", help="Frecuencia cardíaca (latidos por minuto) que muestra tu tensiómetro")
+                    confirmar_alto = st.checkbox("Confirmo que los valores son correctos (requerido si son muy elevados)")
+                    guardar_btn = st.form_submit_button("Guardar medición →", use_container_width=True)
             if guardar_btn:
                 if (sis > 200 or dia > 120) and not confirmar_alto:
                     st.warning(f"⚠️ Los valores {sis}/{dia} son muy elevados. Marcá la casilla de confirmación si son correctos.")
@@ -3254,6 +3267,23 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     grafico_evolucion(mediciones)
                     st.markdown("**Frecuencia cardíaca**")
                     grafico_pulso(mediciones)
+
+        # Tomas del día en 2 columnas: mañana | tarde (siempre visibles, debajo de la carga)
+        if not cerrado:
+            st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
+            col_tm, col_tt = st.columns(2)
+            with col_tm:
+                st.markdown(
+                    '<div class="toma-slot-title">🌅 Tomas de la mañana</div>'
+                    '<div class="tomas-wrap">' + _caja_toma("mañana-1") + _caja_toma("mañana-2") + '</div>',
+                    unsafe_allow_html=True,
+                )
+            with col_tt:
+                st.markdown(
+                    '<div class="toma-slot-title">🌇 Tomas de la tarde</div>'
+                    '<div class="tomas-wrap">' + _caja_toma("tarde-1") + _caja_toma("tarde-2") + '</div>',
+                    unsafe_allow_html=True,
+                )
 
         # Editor de tomas del día (editables solo si <12hs)
         if med_dia:
@@ -3368,7 +3398,7 @@ elif st.session_state.vista == "medico_login":
     navbar("Panel médico")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div class="art-card"><h3 style="margin-top:0;">👨‍⚕️ Acceso médico</h3>', unsafe_allow_html=True)
+        st.markdown('<div class="art-card"><h3 style="margin-top:0;">Acceso médico</h3>', unsafe_allow_html=True)
         if True:
             email_m = st.text_input("Email médico", key="med_email")
             pwd_m = st.text_input("Contraseña", type="password", key="med_pwd")

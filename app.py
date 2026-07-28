@@ -199,14 +199,17 @@ section[data-testid="stSidebar"] { display: none; }
 .logo-tag { font-size: 11px; color: #8896a8; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; line-height: 1; }
 /* Barra de header con controles (vista paciente) */
 .header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
-/* Botones del header más chicos y del mismo tamaño (sin partir el texto en 2 líneas) */
+/* Botones del header más chicos, del mismo tamaño y con el texto centrado */
 [data-testid="stPopover"] > button, .st-key-header_cerrar button {
-    font-size: 13px !important; font-weight: 500 !important;
-    padding: 0.3rem 0.5rem !important; min-height: 0 !important; white-space: nowrap !important;
+    font-size: 12px !important; font-weight: 500 !important;
+    padding: 0.25rem 0.4rem !important; min-height: 0 !important;
+    white-space: nowrap !important;
+    justify-content: center !important; text-align: center !important;
 }
 [data-testid="stPopover"] > button p, .st-key-header_cerrar button p,
 [data-testid="stPopover"] > button span, .st-key-header_cerrar button span {
-    font-size: 13px !important; white-space: nowrap !important;
+    font-size: 12px !important; white-space: nowrap !important; text-align: center !important;
+    width: 100% !important;
 }
 
 /* Cards */
@@ -390,7 +393,7 @@ def logo_markup():
     # por coordenadas exactas → el alto del ícono es igual al alto de los dos textos.
     return """
     <svg viewBox="0 0 342 56" width="342" height="56" xmlns="http://www.w3.org/2000/svg"
-         style="height:44px;width:auto;max-width:100%;display:block;" role="img" aria-label="Arteris — Monitoreo Domiciliario de Presión Arterial">
+         style="height:54px;width:auto;max-width:100%;display:block;" role="img" aria-label="Arteris — Monitoreo Domiciliario de Presión Arterial">
       <rect x="4" y="10" width="36" height="36" rx="9" fill="#1e3a8a"/>
       <path d="M8 29 L12 29 L16 21 L20 37 L23 16 L26 32 L29 24 L33 29 L38 29"
             stroke="#ef4444" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -601,6 +604,102 @@ def dialog_dia_ok(dia_num):
     )
     if st.button("Cerrar", use_container_width=True, key="cerrar_dialog_dia"):
         st.rerun()
+
+# ── Avisos de tomas fuera de protocolo / atrasadas (se renderiza debajo de la carga) ──
+def render_avisos_atrasadas(mediciones, faltantes, tomas_orden, codigo, cerrado):
+    # Aviso si la data tiene tomas fuera del protocolo de 7 días (datos viejos con bug)
+    try:
+        fechas_unicas = sorted({parse_fecha_local(m.get("fecha")) for m in mediciones if parse_fecha_local(m.get("fecha"))})
+        if len(fechas_unicas) > 7:
+            st.warning(
+                f"⚠️ Tu monitoreo tiene tomas distribuidas en **{len(fechas_unicas)} días** "
+                f"(el protocolo es de 7 días). Esto puede pasar si una toma se cargó muy tarde "
+                f"por la noche o quedó asignada a un día distinto. **No afecta el resultado** "
+                f"(usamos los últimos 6 días según el protocolo), pero si querés empezar limpio "
+                f"podés usar el botón **Reiniciar procedimiento** cuando lo completes."
+            )
+    except Exception:
+        pass
+
+    # Aviso de tomas atrasadas — banner grande y visible (solo mientras el protocolo está activo)
+    if faltantes and not cerrado:
+        tomas_pendientes_total = sum(4 - f["tomas_cargadas"] for f in faltantes)
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(245,158,11,0.06));
+                    border:2px solid #f59e0b;border-radius:14px;padding:1.5rem 1.75rem;margin:1rem 0;">
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+            <div style="font-size:42px;line-height:1;">⚠️</div>
+            <div>
+              <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#f59e0b;font-weight:500;line-height:1.2;">
+                Tenés {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''} de cargar
+              </div>
+              <div style="font-size:15px;color:#16233b;margin-top:4px;">
+                En {len(faltantes)} día{'s' if len(faltantes)>1 else ''} anterior{'es' if len(faltantes)>1 else ''} te faltó cargar la presión.
+              </div>
+            </div>
+          </div>
+          <p style="font-size:14px;color:#16233b;line-height:1.5;margin:8px 0 0 0;">
+            Si tomaste la presión esos días pero te olvidaste de cargarla en la app, podés agregarla ahora.
+            <strong style="color:#16233b;">Hacé clic en el botón "Cargar" al lado de cada toma faltante</strong> y completá los datos.
+          </p>
+          <p style="font-size:13px;color:#5a6b82;line-height:1.5;margin:10px 0 0 0;font-style:italic;">
+            Si no llegás a cargar las que te faltan, no te preocupes — seguí adelante con las tomas de hoy.
+            Cada toma que cargues ayuda al resultado final.
+          </p>
+        </div>
+        """, unsafe_allow_html=True)
+        with st.expander(f"👉 Ver y completar las {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''}", expanded=False):
+            st.markdown('<p style="font-size:13px;color:#5a6b82;">Las tomas atrasadas quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
+            for f in faltantes:
+                tomas_faltantes_lista = [t for t in tomas_orden if t not in f["momentos_cargados"]]
+                st.markdown(f"**Día {f['dia']}** ({f['fecha'].strftime('%d/%m/%Y')}) — {f['tomas_cargadas']}/4 tomas cargadas.")
+                for tt in tomas_faltantes_lista:
+                    atr_key = f"{f['dia']}_{tt}"
+                    cols_f = st.columns([3, 1])
+                    with cols_f[0]:
+                        momento_disp = tt.replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
+                        st.caption(f"Falta: {momento_disp}")
+                    with cols_f[1]:
+                        if st.button("Cargar", key=f"btn_atrasada_{atr_key}", use_container_width=True):
+                            if st.session_state.get("atrasada_activa") == atr_key:
+                                st.session_state.pop("atrasada_activa", None)
+                            else:
+                                st.session_state["atrasada_activa"] = atr_key
+                                st.session_state["atrasada_data"] = {"dia": f["dia"], "fecha": f["fecha"].isoformat(), "momento": tt}
+                            st.rerun()
+                    if st.session_state.get("atrasada_activa") == atr_key:
+                        with st.form(f"form_atr_{atr_key}"):
+                            cf1, cf2, cf3 = st.columns(3)
+                            with cf1:
+                                sis_a = st.number_input("Sistólica", min_value=60, max_value=250, value=120, step=1, key=f"sis_atr_{atr_key}")
+                            with cf2:
+                                dia_a = st.number_input("Diastólica", min_value=40, max_value=150, value=80, step=1, key=f"dia_atr_{atr_key}")
+                            with cf3:
+                                pulso_a = st.number_input("Frecuencia cardíaca (lpm)", min_value=30, max_value=220, value=80, step=1, key=f"pul_atr_{atr_key}")
+                            confirmar_a = st.checkbox("Confirmo valores correctos (si son elevados)", key=f"conf_atr_{atr_key}")
+                            cb1, cb2 = st.columns(2)
+                            with cb1:
+                                cancelar_a = st.form_submit_button("Cancelar", use_container_width=True)
+                            with cb2:
+                                guardar_a = st.form_submit_button("Guardar", use_container_width=True, type="primary")
+                        if guardar_a:
+                            if (sis_a > 200 or dia_a > 120) and not confirmar_a:
+                                st.warning(f"⚠️ Los valores {sis_a}/{dia_a} son muy elevados. Marcá la casilla de confirmación si son correctos.")
+                            else:
+                                try:
+                                    guardar_medicion(codigo, sis_a, dia_a, tt, pulso=int(pulso_a),
+                                                     fecha_dia=f["fecha"].isoformat(), atrasada=True)
+                                    st.session_state.pop("atrasada_activa", None)
+                                    st.session_state.pop("atrasada_data", None)
+                                    st.success("✅ Toma atrasada guardada.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"No se pudo guardar la toma: {ex}")
+                        if cancelar_a:
+                            st.session_state.pop("atrasada_activa", None)
+                            st.session_state.pop("atrasada_data", None)
+                            st.rerun()
+                st.markdown("---")
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -2652,7 +2751,7 @@ elif st.session_state.vista == "paciente_home":
     nombre = paciente.get("nombre", "Paciente")
 
     # Header en una sola barra: logo + Mi cuenta + Cerrar sesión
-    h_logo, h_tools, h_logout = st.columns([7, 1.6, 1.6], vertical_alignment="center")
+    h_logo, h_tools, h_logout = st.columns([8, 1.5, 1.5], vertical_alignment="center")
     with h_logo:
         st.markdown(logo_markup(), unsafe_allow_html=True)
     with h_tools:
@@ -2870,102 +2969,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
           </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # Aviso si la data tiene tomas fuera del protocolo de 7 días (datos viejos con bug)
-        try:
-            fechas_unicas = sorted({parse_fecha_local(m.get("fecha")) for m in mediciones if parse_fecha_local(m.get("fecha"))})
-            if len(fechas_unicas) > 7:
-                st.warning(
-                    f"⚠️ Tu monitoreo tiene tomas distribuidas en **{len(fechas_unicas)} días** "
-                    f"(el protocolo es de 7 días). Esto puede pasar si una toma se cargó muy tarde "
-                    f"por la noche o quedó asignada a un día distinto. **No afecta el resultado** "
-                    f"(usamos los últimos 6 días según el protocolo), pero si querés empezar limpio "
-                    f"podés usar el botón **Reiniciar procedimiento** cuando lo completes."
-                )
-        except Exception:
-            pass
-
-        # Aviso de tomas atrasadas — banner grande y visible para que adultos mayores no lo pasen por alto
-        # Solo se muestra mientras el protocolo está activo (no cerrado por ningún motivo).
-        if faltantes and not cerrado:
-            tomas_pendientes_total = sum(4 - f["tomas_cargadas"] for f in faltantes)
-            st.markdown(f"""
-            <div style="background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(245,158,11,0.06));
-                        border:2px solid #f59e0b;border-radius:14px;padding:1.5rem 1.75rem;margin:1rem 0;">
-              <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
-                <div style="font-size:42px;line-height:1;">⚠️</div>
-                <div>
-                  <div style="font-family:'DM Serif Display',serif;font-size:24px;color:#f59e0b;font-weight:500;line-height:1.2;">
-                    Tenés {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''} de cargar
-                  </div>
-                  <div style="font-size:15px;color:#16233b;margin-top:4px;">
-                    En {len(faltantes)} día{'s' if len(faltantes)>1 else ''} anterior{'es' if len(faltantes)>1 else ''} te faltó cargar la presión.
-                  </div>
-                </div>
-              </div>
-              <p style="font-size:14px;color:#16233b;line-height:1.5;margin:8px 0 0 0;">
-                Si tomaste la presión esos días pero te olvidaste de cargarla en la app, podés agregarla ahora.
-                <strong style="color:#16233b;">Hacé clic en el botón "Cargar" al lado de cada toma faltante</strong> y completá los datos.
-              </p>
-              <p style="font-size:13px;color:#5a6b82;line-height:1.5;margin:10px 0 0 0;font-style:italic;">
-                Si no llegás a cargar las que te faltan, no te preocupes — seguí adelante con las tomas de hoy.
-                Cada toma que cargues ayuda al resultado final.
-              </p>
-            </div>
-            """, unsafe_allow_html=True)
-            with st.expander(f"👉 Ver y completar las {tomas_pendientes_total} toma{'s' if tomas_pendientes_total != 1 else ''} pendiente{'s' if tomas_pendientes_total != 1 else ''}", expanded=False):
-                st.markdown('<p style="font-size:13px;color:#5a6b82;">Las tomas atrasadas quedan marcadas como "cargadas con atraso" para tu médico.</p>', unsafe_allow_html=True)
-                for f in faltantes:
-                    tomas_faltantes_lista = [t for t in tomas_orden if t not in f["momentos_cargados"]]
-                    st.markdown(f"**Día {f['dia']}** ({f['fecha'].strftime('%d/%m/%Y')}) — {f['tomas_cargadas']}/4 tomas cargadas.")
-                    for tt in tomas_faltantes_lista:
-                        atr_key = f"{f['dia']}_{tt}"
-                        cols_f = st.columns([3, 1])
-                        with cols_f[0]:
-                            momento_disp = tt.replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
-                            st.caption(f"Falta: {momento_disp}")
-                        with cols_f[1]:
-                            if st.button("Cargar", key=f"btn_atrasada_{atr_key}", use_container_width=True):
-                                if st.session_state.get("atrasada_activa") == atr_key:
-                                    st.session_state.pop("atrasada_activa", None)
-                                else:
-                                    st.session_state["atrasada_activa"] = atr_key
-                                    st.session_state["atrasada_data"] = {"dia": f["dia"], "fecha": f["fecha"].isoformat(), "momento": tt}
-                                st.rerun()
-                        # Form inline justo debajo si esta toma es la seleccionada
-                        if st.session_state.get("atrasada_activa") == atr_key:
-                            with st.form(f"form_atr_{atr_key}"):
-                                cf1, cf2, cf3 = st.columns(3)
-                                with cf1:
-                                    sis_a = st.number_input("Sistólica", min_value=60, max_value=250, value=120, step=1, key=f"sis_atr_{atr_key}")
-                                with cf2:
-                                    dia_a = st.number_input("Diastólica", min_value=40, max_value=150, value=80, step=1, key=f"dia_atr_{atr_key}")
-                                with cf3:
-                                    pulso_a = st.number_input("Frecuencia cardíaca (lpm)", min_value=30, max_value=220, value=80, step=1, key=f"pul_atr_{atr_key}")
-                                confirmar_a = st.checkbox("Confirmo valores correctos (si son elevados)", key=f"conf_atr_{atr_key}")
-                                cb1, cb2 = st.columns(2)
-                                with cb1:
-                                    cancelar_a = st.form_submit_button("Cancelar", use_container_width=True)
-                                with cb2:
-                                    guardar_a = st.form_submit_button("Guardar", use_container_width=True, type="primary")
-                            if guardar_a:
-                                if (sis_a > 200 or dia_a > 120) and not confirmar_a:
-                                    st.warning(f"⚠️ Los valores {sis_a}/{dia_a} son muy elevados. Marcá la casilla de confirmación si son correctos.")
-                                else:
-                                    try:
-                                        guardar_medicion(codigo, sis_a, dia_a, tt, pulso=int(pulso_a),
-                                                         fecha_dia=f["fecha"].isoformat(), atrasada=True)
-                                        st.session_state.pop("atrasada_activa", None)
-                                        st.session_state.pop("atrasada_data", None)
-                                        st.success("✅ Toma atrasada guardada.")
-                                        st.rerun()
-                                    except Exception as ex:
-                                        st.error(f"No se pudo guardar la toma: {ex}")
-                            if cancelar_a:
-                                st.session_state.pop("atrasada_activa", None)
-                                st.session_state.pop("atrasada_data", None)
-                                st.rerun()
-                    st.markdown("---")
 
         if cerrado:
             resultado = calcular_resultado(mediciones)
@@ -3286,6 +3289,8 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 '</div>',
                 unsafe_allow_html=True,
             )
+            # Avisos de tomas fuera de protocolo / atrasadas (debajo de la carga y las tomas)
+            render_avisos_atrasadas(mediciones, faltantes, tomas_orden, codigo, cerrado)
 
         # Editor de tomas del día (editables solo si <12hs)
         if med_dia:

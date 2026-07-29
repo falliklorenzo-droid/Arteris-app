@@ -366,7 +366,7 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-pend { font-size:13px; color:#8896a8; }
 /* Recuadros de toma: cargada (blanca) y pendiente (gris tenue), MISMO alto/padding → simétricos */
 [class*="st-key-tomabox_"], [class*="st-key-tomapend_"] {
-    border-radius:12px !important; padding:22px 16px !important; margin-bottom:2px !important;
+    border-radius:12px !important; padding:16px !important; margin-bottom:2px !important;
 }
 .toma-right-cell { text-align:right; display:flex; align-items:center; justify-content:flex-end; }
 .toma-val-pend { color:#7d8896 !important; }
@@ -3299,21 +3299,15 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 # Etiqueta arriba; en UNA fila: valor + "Completado" + lápiz, centrados juntos.
                 box_key = f"tomabox_{m['id']}" if m else f"tomapend_{momento}"
                 with st.container(border=True, key=box_key):
+                    # Etiqueta arriba (título chico) y, en UNA fila, valor + Completado + lápiz → alineados
+                    st.markdown(f'<div class="toma-label">{etiquetas_toma[momento]}</div>', unsafe_allow_html=True)
                     c_val, c_badge, c_pen = st.columns([5, 2.4, 0.7], vertical_alignment="center", gap="small")
                     with c_val:
                         if m:
                             pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
-                            st.markdown(
-                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
-                                f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown(f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>', unsafe_allow_html=True)
                         else:
-                            st.markdown(
-                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
-                                f'<div class="toma-val toma-val-pend">—/—</div>',
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown('<div class="toma-val toma-val-pend">—/—</div>', unsafe_allow_html=True)
                     with c_badge:
                         if m:
                             st.markdown('<div class="toma-right-cell"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)

@@ -362,11 +362,17 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-val { font-family:'DM Serif Display', serif; font-size:30px; color:#16233b; line-height:1; }
 .toma-val small { font-size:15px; color:#8896a8; font-family:'DM Sans',sans-serif; }
 .toma-slot-title { font-size:15px; font-weight:600; color:#1e3a8a; text-transform:uppercase; letter-spacing:1px; margin:4px 0 8px; }
-.toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:12px; font-weight:600; padding:4px 11px; border-radius:20px; white-space:nowrap; }
+.toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; white-space:nowrap; display:inline-block; }
 .toma-pend { font-size:13px; color:#8896a8; }
-/* Recuadro de toma cargada (contenedor) con el mismo look que la caja "done" */
-[class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; border-radius:12px !important; padding:12px 14px !important; }
-[class*="st-key-tomabox_"] .toma-val { margin-top:2px; }
+/* Recuadros de toma: cargada (blanca) y pendiente (gris tenue), MISMO alto/padding → simétricos */
+[class*="st-key-tomabox_"], [class*="st-key-tomapend_"] {
+    border-radius:12px !important; padding:14px 16px !important; margin-bottom:2px !important;
+    overflow:hidden !important;
+}
+[class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; }
+[class*="st-key-tomapend_"] { background:#f6f8fb !important; border:1px dashed #d6deea !important; }
+[class*="st-key-tomabox_"] .toma-val, [class*="st-key-tomapend_"] .toma-val { margin-top:2px; }
+.toma-pend-badge { font-size:13px; color:#8896a8; white-space:nowrap; }
 /* Lapicito de editar: sutil, chico, al lado del "Completado" */
 div[class*="st-key-btn_edit_grid_"] button {
     background:transparent !important; border:0 !important; box-shadow:none !important;
@@ -3285,30 +3291,38 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         if not cerrado:
             def _slot_toma(momento):
                 m = med_por_momento.get(momento)
-                if not m:
-                    # Pendiente: recuadro borroso (HTML)
-                    st.markdown(_caja_toma(momento), unsafe_allow_html=True)
-                    return
-                mid = m["id"]
-                ekey = f"editando_{mid}"
-                pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
-                with st.container(border=True, key=f"tomabox_{mid}"):
-                    # Opción B: valor a la izquierda; "Completado" + lápiz juntos a la derecha, misma línea
-                    c_val, c_badge, c_pen = st.columns([5, 2.3, 0.9], vertical_alignment="center", gap="small")
+                # Todos los recuadros usan el MISMO componente (mismo alto/padding) para que
+                # mañana y tarde queden simétricos. Cargada = blanco; pendiente = gris tenue.
+                box_key = f"tomabox_{m['id']}" if m else f"tomapend_{momento}"
+                with st.container(border=True, key=box_key):
+                    c_val, c_badge, c_pen = st.columns([5, 2.5, 0.9], vertical_alignment="center", gap="small")
                     with c_val:
-                        st.markdown(
-                            f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
-                            f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
-                            unsafe_allow_html=True,
-                        )
+                        if m:
+                            pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
+                            st.markdown(
+                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                                f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
+                                unsafe_allow_html=True,
+                            )
+                        else:
+                            st.markdown(
+                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                                f'<div class="toma-val" style="color:#b8c2d0;">—/—</div>',
+                                unsafe_allow_html=True,
+                            )
                     with c_badge:
-                        st.markdown('<div style="text-align:right;"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)
+                        if m:
+                            st.markdown('<div style="text-align:right;"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown('<div style="text-align:right;"><span class="toma-pend-badge">Pendiente</span></div>', unsafe_allow_html=True)
                     with c_pen:
-                        if puede_editar(m):
-                            if st.button(":material/edit:", key=f"btn_edit_grid_{mid}", type="tertiary", help="Editar esta toma"):
-                                st.session_state[ekey] = not st.session_state.get(ekey, False)
+                        if m and puede_editar(m):
+                            if st.button(":material/edit:", key=f"btn_edit_grid_{m['id']}", type="tertiary", help="Editar esta toma"):
+                                ek = f"editando_{m['id']}"
+                                st.session_state[ek] = not st.session_state.get(ek, False)
                                 st.rerun()
-                    if st.session_state.get(ekey):
+                    ekey = f"editando_{m['id']}" if m else "_none_"
+                    if m and st.session_state.get(ekey):
                         with st.form(f"form_edit_{mid}"):
                             # Apilados (a lo ancho) para que aparezcan los botones + / −
                             sis_e = st.number_input("Sistólica (mayor)", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")

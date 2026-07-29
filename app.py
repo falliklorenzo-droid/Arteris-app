@@ -381,6 +381,13 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 [class*="st-key-tomapend_"] [data-testid="stVerticalBlock"] { gap:0.35rem !important; }
 .toma-pend-badge { font-size:13px; color:#6b7688; font-weight:500; white-space:nowrap; }
 /* Lapicito de editar: sutil, chico, al lado del "Completado" */
+/* El contenedor del botón trae un margen por defecto que descentra el lápiz (más aire abajo).
+   Lo eliminamos y lo centramos verticalmente — SOLO afecta al lápiz. */
+div[class*="st-key-btn_edit_grid_"] {
+    margin:0 !important; padding:0 !important;
+    display:flex !important; align-items:center !important; justify-content:flex-end !important;
+    align-self:center !important;
+}
 div[class*="st-key-btn_edit_grid_"] button {
     background:transparent !important; border:0 !important; box-shadow:none !important;
     color:#5a6b82 !important; min-height:0 !important; height:30px !important; width:30px !important;

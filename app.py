@@ -358,8 +358,8 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-box { background:#f6f8fb; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .toma-box.done { background:#ffffff; border-color:#c7d7f0; }
 .toma-box.pending { opacity:0.55; filter:blur(0.4px); border-style:dashed; }
-.toma-label { font-size:13px; color:#5a6b82; text-transform:uppercase; letter-spacing:0.5px; line-height:1.1; margin-bottom:3px; }
-.toma-val { font-family:'DM Serif Display', serif; font-size:24px; color:#16233b; line-height:1.1; }
+.toma-label { font-size:13px; color:#5a6b82; text-transform:uppercase; letter-spacing:0.5px; line-height:1; margin-bottom:2px; }
+.toma-val { font-family:'DM Serif Display', serif; font-size:24px; color:#16233b; line-height:1; }
 .toma-val small { font-size:15px; color:#8896a8; font-family:'DM Sans',sans-serif; }
 .toma-slot-title { font-size:15px; font-weight:600; color:#1e3a8a; text-transform:uppercase; letter-spacing:1px; margin:4px 0 8px; }
 .toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; white-space:nowrap; display:inline-block; }
@@ -367,7 +367,10 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 /* Recuadros de toma: cargada (blanca) y pendiente (gris tenue), MISMO alto/padding → simétricos */
 [class*="st-key-tomabox_"], [class*="st-key-tomapend_"] {
     border-radius:12px !important; padding:16px !important; margin-bottom:2px !important;
+    min-height:78px !important; display:flex !important; align-items:center !important;
 }
+/* que la fila interna ocupe todo el ancho y quede centrada verticalmente */
+[class*="st-key-tomabox_"] > div, [class*="st-key-tomapend_"] > div { width:100% !important; }
 .toma-right-cell { text-align:right; display:flex; align-items:center; justify-content:flex-end; }
 .toma-val-pend { color:#7d8896 !important; }
 [class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; }
@@ -3299,15 +3302,22 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 # Etiqueta arriba; en UNA fila: valor + "Completado" + lápiz, centrados juntos.
                 box_key = f"tomabox_{m['id']}" if m else f"tomapend_{momento}"
                 with st.container(border=True, key=box_key):
-                    # Etiqueta arriba (título chico) y, en UNA fila, valor + Completado + lápiz → alineados
-                    st.markdown(f'<div class="toma-label">{etiquetas_toma[momento]}</div>', unsafe_allow_html=True)
+                    # Etiqueta + valor juntos (grupo compacto centrado); Completado + lápiz centrados a la misma altura
                     c_val, c_badge, c_pen = st.columns([5, 2.4, 0.7], vertical_alignment="center", gap="small")
                     with c_val:
                         if m:
                             pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
-                            st.markdown(f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>', unsafe_allow_html=True)
+                            st.markdown(
+                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                                f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
+                                unsafe_allow_html=True,
+                            )
                         else:
-                            st.markdown('<div class="toma-val toma-val-pend">—/—</div>', unsafe_allow_html=True)
+                            st.markdown(
+                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                                f'<div class="toma-val toma-val-pend">—/—</div>',
+                                unsafe_allow_html=True,
+                            )
                     with c_badge:
                         if m:
                             st.markdown('<div class="toma-right-cell"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)

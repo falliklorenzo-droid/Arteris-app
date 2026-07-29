@@ -364,6 +364,18 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-slot-title { font-size:15px; font-weight:600; color:#1e3a8a; text-transform:uppercase; letter-spacing:1px; margin:4px 0 8px; }
 .toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:12px; font-weight:600; padding:4px 11px; border-radius:20px; white-space:nowrap; }
 .toma-pend { font-size:13px; color:#8896a8; }
+/* Recuadro de toma cargada (contenedor) con el mismo look que la caja "done" */
+[class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; border-radius:12px !important; padding:12px 14px !important; }
+[class*="st-key-tomabox_"] .toma-val { margin-top:2px; }
+/* Lapicito de editar: sutil, chico, al lado del "Completado" */
+div[class*="st-key-btn_edit_grid_"] button {
+    background:transparent !important; border:0 !important; box-shadow:none !important;
+    color:#5a6b82 !important; min-height:0 !important; height:30px !important; width:30px !important;
+    padding:0 !important; border-radius:8px !important;
+    display:inline-flex !important; align-items:center !important; justify-content:center !important;
+}
+div[class*="st-key-btn_edit_grid_"] button:hover { color:#1e3a8a !important; background:#eef4ff !important; }
+div[class*="st-key-btn_edit_grid_"] button [data-testid="stIconMaterial"] { font-size:19px !important; }
 /* Recuadro destacado de carga de medición (entre progreso y tomas) */
 .st-key-zona_toma { background:#eef4ff !important; border:2px solid #93b4f5 !important; border-radius:16px !important; padding:6px 4px !important; }
 
@@ -3272,42 +3284,53 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         # Tomas del día en 2 columnas: mañana | tarde (con lápiz para editar las cargadas)
         if not cerrado:
             def _slot_toma(momento):
-                st.markdown(_caja_toma(momento), unsafe_allow_html=True)
                 m = med_por_momento.get(momento)
                 if not m:
+                    # Pendiente: recuadro borroso (HTML)
+                    st.markdown(_caja_toma(momento), unsafe_allow_html=True)
                     return
                 mid = m["id"]
                 ekey = f"editando_{mid}"
-                if st.session_state.get(ekey):
-                    with st.form(f"form_edit_{mid}"):
-                        e1, e2, e3 = st.columns(3)
-                        with e1:
-                            sis_e = st.number_input("Sistólica", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")
-                        with e2:
-                            dia_e = st.number_input("Diastólica", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{mid}")
-                        with e3:
-                            pul_e = st.number_input("Frec. cardíaca", min_value=30, max_value=220, value=int(m.get("pulso") or 80), step=1, key=f"e_pul_{mid}")
-                        b1, b2 = st.columns(2)
-                        with b1:
-                            ok_e = st.form_submit_button("Guardar", use_container_width=True)
-                        with b2:
-                            ca_e = st.form_submit_button("Cancelar", use_container_width=True)
-                    if ok_e:
-                        if editar_medicion(mid, sis_e, dia_e, pulso=int(pul_e)):
-                            st.success("✅ Toma actualizada.")
+                pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
+                with st.container(border=True, key=f"tomabox_{mid}"):
+                    izq, der = st.columns([5, 3], vertical_alignment="center")
+                    with izq:
+                        st.markdown(
+                            f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                            f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
+                            unsafe_allow_html=True,
+                        )
+                    with der:
+                        with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
+                            st.markdown('<span class="toma-check">✓ Completado</span>', unsafe_allow_html=True)
+                            if puede_editar(m):
+                                if st.button(":material/edit:", key=f"btn_edit_grid_{mid}", type="tertiary", help="Editar esta toma"):
+                                    st.session_state[ekey] = not st.session_state.get(ekey, False)
+                                    st.rerun()
+                    if st.session_state.get(ekey):
+                        with st.form(f"form_edit_{mid}"):
+                            e1, e2, e3 = st.columns(3)
+                            with e1:
+                                sis_e = st.number_input("Sistólica", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")
+                            with e2:
+                                dia_e = st.number_input("Diastólica", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{mid}")
+                            with e3:
+                                pul_e = st.number_input("Frec. cardíaca", min_value=30, max_value=220, value=int(m.get("pulso") or 80), step=1, key=f"e_pul_{mid}")
+                            b1, b2 = st.columns(2)
+                            with b1:
+                                ok_e = st.form_submit_button("Guardar", use_container_width=True)
+                            with b2:
+                                ca_e = st.form_submit_button("Cancelar", use_container_width=True)
+                        if ok_e:
+                            if editar_medicion(mid, sis_e, dia_e, pulso=int(pul_e)):
+                                st.success("✅ Toma actualizada.")
+                                del st.session_state[ekey]
+                                st.rerun()
+                            else:
+                                st.error("No se pudo guardar la edición.")
+                        if ca_e:
                             del st.session_state[ekey]
                             st.rerun()
-                        else:
-                            st.error("No se pudo guardar la edición.")
-                    if ca_e:
-                        del st.session_state[ekey]
-                        st.rerun()
-                elif puede_editar(m):
-                    if st.button("✏️ Editar", key=f"btn_edit_grid_{mid}", type="secondary", use_container_width=True):
-                        st.session_state[ekey] = True
-                        st.rerun()
-                else:
-                    st.caption("🔒 No editable (pasaron más de 12 hs)")
 
             st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
             col_tm, col_tt = st.columns(2)

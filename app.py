@@ -366,16 +366,18 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-pend { font-size:13px; color:#8896a8; }
 /* Recuadros de toma: cargada (blanca) y pendiente (gris tenue), MISMO alto/padding → simétricos */
 [class*="st-key-tomabox_"], [class*="st-key-tomapend_"] {
-    border-radius:12px !important; padding:14px 16px !important; margin-bottom:2px !important;
+    border-radius:12px !important; padding:12px 16px !important; margin-bottom:2px !important;
     overflow:hidden !important;
 }
+.toma-right-cell { text-align:right; }
+.toma-val-pend { color:#7d8896 !important; }
 [class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; }
 [class*="st-key-tomapend_"] { background:#f6f8fb !important; border:1px dashed #d6deea !important; }
 [class*="st-key-tomabox_"] .toma-val, [class*="st-key-tomapend_"] .toma-val { margin-top:2px; }
 /* menos separación entre la etiqueta y la fila (valor/completado) → recuadro más compacto */
 [class*="st-key-tomabox_"] [data-testid="stVerticalBlock"],
 [class*="st-key-tomapend_"] [data-testid="stVerticalBlock"] { gap:0.35rem !important; }
-.toma-pend-badge { font-size:13px; color:#8896a8; white-space:nowrap; }
+.toma-pend-badge { font-size:13px; color:#6b7688; font-weight:500; white-space:nowrap; }
 /* Lapicito de editar: sutil, chico, al lado del "Completado" */
 div[class*="st-key-btn_edit_grid_"] button {
     background:transparent !important; border:0 !important; box-shadow:none !important;
@@ -3298,19 +3300,26 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 # Etiqueta arriba; en UNA fila: valor + "Completado" + lápiz, centrados juntos.
                 box_key = f"tomabox_{m['id']}" if m else f"tomapend_{momento}"
                 with st.container(border=True, key=box_key):
-                    st.markdown(f'<div class="toma-label">{etiquetas_toma[momento]}</div>', unsafe_allow_html=True)
-                    c_val, c_badge, c_pen = st.columns([5, 2.5, 0.9], vertical_alignment="center", gap="small")
+                    c_val, c_badge, c_pen = st.columns([5, 2.4, 0.7], vertical_alignment="center", gap="small")
                     with c_val:
                         if m:
                             pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
-                            st.markdown(f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>', unsafe_allow_html=True)
+                            st.markdown(
+                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                                f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
+                                unsafe_allow_html=True,
+                            )
                         else:
-                            st.markdown('<div class="toma-val" style="color:#b8c2d0;">—/—</div>', unsafe_allow_html=True)
+                            st.markdown(
+                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
+                                f'<div class="toma-val toma-val-pend">—/—</div>',
+                                unsafe_allow_html=True,
+                            )
                     with c_badge:
                         if m:
-                            st.markdown('<div style="text-align:right;"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)
+                            st.markdown('<div class="toma-right-cell"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)
                         else:
-                            st.markdown('<div style="text-align:right;"><span class="toma-pend-badge">Pendiente</span></div>', unsafe_allow_html=True)
+                            st.markdown('<div class="toma-right-cell"><span class="toma-pend-badge">Pendiente</span></div>', unsafe_allow_html=True)
                     with c_pen:
                         if m and puede_editar(m):
                             if st.button(":material/edit:", key=f"btn_edit_grid_{m['id']}", type="tertiary", help="Editar esta toma"):

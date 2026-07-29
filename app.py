@@ -359,17 +359,16 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-box.done { background:#ffffff; border-color:#c7d7f0; }
 .toma-box.pending { opacity:0.55; filter:blur(0.4px); border-style:dashed; }
 .toma-label { font-size:14px; color:#5a6b82; text-transform:uppercase; letter-spacing:0.5px; }
-.toma-val { font-family:'DM Serif Display', serif; font-size:27px; color:#16233b; line-height:1; }
+.toma-val { font-family:'DM Serif Display', serif; font-size:27px; color:#16233b; line-height:1.2; }
 .toma-val small { font-size:15px; color:#8896a8; font-family:'DM Sans',sans-serif; }
 .toma-slot-title { font-size:15px; font-weight:600; color:#1e3a8a; text-transform:uppercase; letter-spacing:1px; margin:4px 0 8px; }
-.toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; white-space:nowrap; display:inline-block; }
+.toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; white-space:nowrap; display:inline-block; }
 .toma-pend { font-size:13px; color:#8896a8; }
 /* Recuadros de toma: cargada (blanca) y pendiente (gris tenue), MISMO alto/padding → simétricos */
 [class*="st-key-tomabox_"], [class*="st-key-tomapend_"] {
-    border-radius:12px !important; padding:12px 16px !important; margin-bottom:2px !important;
-    overflow:hidden !important;
+    border-radius:12px !important; padding:18px 16px !important; margin-bottom:2px !important;
 }
-.toma-right-cell { text-align:right; }
+.toma-right-cell { text-align:right; display:flex; align-items:center; justify-content:flex-end; }
 .toma-val-pend { color:#7d8896 !important; }
 [class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; }
 [class*="st-key-tomapend_"] { background:#f6f8fb !important; border:1px dashed #d6deea !important; }

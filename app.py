@@ -359,7 +359,7 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 .toma-box.done { background:#ffffff; border-color:#c7d7f0; }
 .toma-box.pending { opacity:0.55; filter:blur(0.4px); border-style:dashed; }
 .toma-label { font-size:14px; color:#5a6b82; text-transform:uppercase; letter-spacing:0.5px; }
-.toma-val { font-family:'DM Serif Display', serif; font-size:30px; color:#16233b; line-height:1; }
+.toma-val { font-family:'DM Serif Display', serif; font-size:27px; color:#16233b; line-height:1; }
 .toma-val small { font-size:15px; color:#8896a8; font-family:'DM Sans',sans-serif; }
 .toma-slot-title { font-size:15px; font-weight:600; color:#1e3a8a; text-transform:uppercase; letter-spacing:1px; margin:4px 0 8px; }
 .toma-check { background:rgba(22,163,74,0.12); color:#15803d; font-size:12px; font-weight:600; padding:3px 10px; border-radius:20px; white-space:nowrap; display:inline-block; }
@@ -372,6 +372,9 @@ div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
 [class*="st-key-tomabox_"] { background:#ffffff !important; border:1px solid #c7d7f0 !important; }
 [class*="st-key-tomapend_"] { background:#f6f8fb !important; border:1px dashed #d6deea !important; }
 [class*="st-key-tomabox_"] .toma-val, [class*="st-key-tomapend_"] .toma-val { margin-top:2px; }
+/* menos separación entre la etiqueta y la fila (valor/completado) → recuadro más compacto */
+[class*="st-key-tomabox_"] [data-testid="stVerticalBlock"],
+[class*="st-key-tomapend_"] [data-testid="stVerticalBlock"] { gap:0.35rem !important; }
 .toma-pend-badge { font-size:13px; color:#8896a8; white-space:nowrap; }
 /* Lapicito de editar: sutil, chico, al lado del "Completado" */
 div[class*="st-key-btn_edit_grid_"] button {
@@ -3291,25 +3294,18 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
         if not cerrado:
             def _slot_toma(momento):
                 m = med_por_momento.get(momento)
-                # Todos los recuadros usan el MISMO componente (mismo alto/padding) para que
-                # mañana y tarde queden simétricos. Cargada = blanco; pendiente = gris tenue.
+                # Todos los recuadros usan el MISMO componente (mismo alto/padding) → simétricos.
+                # Etiqueta arriba; en UNA fila: valor + "Completado" + lápiz, centrados juntos.
                 box_key = f"tomabox_{m['id']}" if m else f"tomapend_{momento}"
                 with st.container(border=True, key=box_key):
+                    st.markdown(f'<div class="toma-label">{etiquetas_toma[momento]}</div>', unsafe_allow_html=True)
                     c_val, c_badge, c_pen = st.columns([5, 2.5, 0.9], vertical_alignment="center", gap="small")
                     with c_val:
                         if m:
                             pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
-                            st.markdown(
-                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
-                                f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown(f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>', unsafe_allow_html=True)
                         else:
-                            st.markdown(
-                                f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
-                                f'<div class="toma-val" style="color:#b8c2d0;">—/—</div>',
-                                unsafe_allow_html=True,
-                            )
+                            st.markdown('<div class="toma-val" style="color:#b8c2d0;">—/—</div>', unsafe_allow_html=True)
                     with c_badge:
                         if m:
                             st.markdown('<div style="text-align:right;"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)
@@ -3321,8 +3317,8 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                                 ek = f"editando_{m['id']}"
                                 st.session_state[ek] = not st.session_state.get(ek, False)
                                 st.rerun()
-                    ekey = f"editando_{m['id']}" if m else "_none_"
-                    if m and st.session_state.get(ekey):
+                    if m and st.session_state.get(f"editando_{m['id']}"):
+                        mid = m["id"]
                         with st.form(f"form_edit_{mid}"):
                             # Apilados (a lo ancho) para que aparezcan los botones + / −
                             sis_e = st.number_input("Sistólica (mayor)", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")
@@ -3330,18 +3326,18 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                             pul_e = st.number_input("Frecuencia cardíaca (lpm)", min_value=30, max_value=220, value=int(m.get("pulso") or 80), step=1, key=f"e_pul_{mid}")
                             b1, b2 = st.columns(2)
                             with b1:
-                                ok_e = st.form_submit_button("Guardar", use_container_width=True)
+                                ok_e = st.form_submit_button("Guardar cambios", use_container_width=True)
                             with b2:
                                 ca_e = st.form_submit_button("Cancelar", use_container_width=True)
                         if ok_e:
                             if editar_medicion(mid, sis_e, dia_e, pulso=int(pul_e)):
                                 st.success("✅ Toma actualizada.")
-                                del st.session_state[ekey]
+                                del st.session_state[f"editando_{mid}"]
                                 st.rerun()
                             else:
                                 st.error("No se pudo guardar la edición.")
                         if ca_e:
-                            del st.session_state[ekey]
+                            del st.session_state[f"editando_{mid}"]
                             st.rerun()
 
             st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)

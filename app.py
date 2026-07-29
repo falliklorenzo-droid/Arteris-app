@@ -213,6 +213,11 @@ section[data-testid="stSidebar"] { display: none; }
     font-size: 13px !important; white-space: nowrap !important; text-align: center !important;
     line-height: 1 !important; margin: 0 !important;
 }
+/* Los íconos Material del header no se achican con el texto */
+[data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+.st-key-header_cerrar button [data-testid="stIconMaterial"] {
+    font-size: 18px !important; width: 18px !important; height: 18px !important;
+}
 
 /* Cards */
 .art-card {
@@ -2758,16 +2763,16 @@ elif st.session_state.vista == "paciente_home":
         st.markdown(logo_markup(), unsafe_allow_html=True)
     with h_right:
         with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
-            with st.popover("⚙️ Mi cuenta"):
+            with st.popover("Mi cuenta", icon=":material/settings:"):
                 st.markdown(f'<p style="font-size:13px;color:#5a6b82;margin-bottom:8px;">Sesión activa como<br><strong style="color:#16233b;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
                 st.divider()
-                if st.button("⚙️ Ajustes", use_container_width=True, key="pop_home_ajustes"):
+                if st.button("Ajustes", icon=":material/tune:", use_container_width=True, key="pop_home_ajustes"):
                     st.session_state.vista = "paciente_ajustes"
                     st.rerun()
-                if st.button("📚 Historial", use_container_width=True, key="pop_home_historial"):
+                if st.button("Historial", icon=":material/history:", use_container_width=True, key="pop_home_historial"):
                     st.session_state.vista = "paciente_historial"
                     st.rerun()
-            if st.button("🚪 Cerrar sesión", type="secondary", key="header_cerrar"):
+            if st.button("Cerrar sesión", icon=":material/logout:", type="secondary", key="header_cerrar"):
                 cerrar_sesion()
     st.markdown('<div class="header-underline"></div>', unsafe_allow_html=True)
 

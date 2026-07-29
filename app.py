@@ -199,17 +199,18 @@ section[data-testid="stSidebar"] { display: none; }
 .logo-tag { font-size: 11px; color: #8896a8; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; line-height: 1; }
 /* Barra de header con controles (vista paciente) */
 .header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
-/* Botones del header más chicos, del mismo tamaño y con el texto centrado */
+/* Header: botones compactos, misma altura que el logo, texto en UNA línea y centrado */
 [data-testid="stPopover"] > button, .st-key-header_cerrar button {
-    font-size: 12px !important; font-weight: 500 !important;
-    padding: 0.25rem 0.4rem !important; min-height: 0 !important;
-    white-space: nowrap !important;
-    justify-content: center !important; text-align: center !important;
+    height: 50px !important; min-height: 50px !important;
+    padding: 0 12px !important;
+    font-size: 13px !important; font-weight: 500 !important;
+    border-radius: 10px !important;
+    display: inline-flex !important; align-items: center !important; justify-content: center !important;
+    white-space: nowrap !important; line-height: 1 !important;
 }
-[data-testid="stPopover"] > button p, .st-key-header_cerrar button p,
-[data-testid="stPopover"] > button span, .st-key-header_cerrar button span {
-    font-size: 12px !important; white-space: nowrap !important; text-align: center !important;
-    width: 100% !important;
+[data-testid="stPopover"] > button *, .st-key-header_cerrar button * {
+    font-size: 13px !important; white-space: nowrap !important; text-align: center !important;
+    line-height: 1 !important; margin: 0 !important;
 }
 
 /* Cards */
@@ -2751,7 +2752,7 @@ elif st.session_state.vista == "paciente_home":
     nombre = paciente.get("nombre", "Paciente")
 
     # Header en una sola barra: logo + Mi cuenta + Cerrar sesión
-    h_logo, h_tools, h_logout = st.columns([8, 1.5, 1.5], vertical_alignment="center")
+    h_logo, h_tools, h_logout = st.columns([7, 1.5, 1.7], vertical_alignment="center")
     with h_logo:
         st.markdown(logo_markup(), unsafe_allow_html=True)
     with h_tools:
@@ -3208,12 +3209,6 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
               <p style="color:#5a6b82;margin-top:0.5rem;font-size:16px;">Completaste el Día {dia_actual}. El sistema avanza al Día {min(dia_actual+1,7)} cuando cambie la fecha.</p>
             </div>
             """, unsafe_allow_html=True)
-            if total >= 4:
-                with st.expander("📈 Ver evolución hasta ahora"):
-                    st.markdown("**Presión arterial**")
-                    grafico_evolucion(mediciones)
-                    st.markdown("**Frecuencia cardíaca**")
-                    grafico_pulso(mediciones)
         else:
             # Pop-up "Completaste la mañana" una sola vez por día al pasar a la tarde
             if terminada_manana and es_tarde:
@@ -3257,29 +3252,56 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                     st.success("✅ Medición guardada.")
                     st.rerun()
 
-            if total >= 2:
-                with st.expander("📈 Ver evolución hasta ahora"):
-                    st.markdown("**Presión arterial**")
-                    grafico_evolucion(mediciones)
-                    st.markdown("**Frecuencia cardíaca**")
-                    grafico_pulso(mediciones)
-
-        # Tomas del día en 2 columnas: mañana | tarde (siempre visibles, debajo de la carga)
+        # Tomas del día en 2 columnas: mañana | tarde (con lápiz para editar las cargadas)
         if not cerrado:
+            def _slot_toma(momento):
+                st.markdown(_caja_toma(momento), unsafe_allow_html=True)
+                m = med_por_momento.get(momento)
+                if not m:
+                    return
+                mid = m["id"]
+                ekey = f"editando_{mid}"
+                if st.session_state.get(ekey):
+                    with st.form(f"form_edit_{mid}"):
+                        e1, e2, e3 = st.columns(3)
+                        with e1:
+                            sis_e = st.number_input("Sistólica", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")
+                        with e2:
+                            dia_e = st.number_input("Diastólica", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{mid}")
+                        with e3:
+                            pul_e = st.number_input("Frec. cardíaca", min_value=30, max_value=220, value=int(m.get("pulso") or 80), step=1, key=f"e_pul_{mid}")
+                        b1, b2 = st.columns(2)
+                        with b1:
+                            ok_e = st.form_submit_button("Guardar", use_container_width=True)
+                        with b2:
+                            ca_e = st.form_submit_button("Cancelar", use_container_width=True)
+                    if ok_e:
+                        if editar_medicion(mid, sis_e, dia_e, pulso=int(pul_e)):
+                            st.success("✅ Toma actualizada.")
+                            del st.session_state[ekey]
+                            st.rerun()
+                        else:
+                            st.error("No se pudo guardar la edición.")
+                    if ca_e:
+                        del st.session_state[ekey]
+                        st.rerun()
+                elif puede_editar(m):
+                    if st.button("✏️ Editar", key=f"btn_edit_grid_{mid}", type="secondary", use_container_width=True):
+                        st.session_state[ekey] = True
+                        st.rerun()
+                else:
+                    st.caption("🔒 No editable (pasaron más de 12 hs)")
+
             st.markdown('<div style="height:6px;"></div>', unsafe_allow_html=True)
             col_tm, col_tt = st.columns(2)
             with col_tm:
-                st.markdown(
-                    '<div class="toma-slot-title">🌅 Tomas de la mañana</div>'
-                    '<div class="tomas-wrap">' + _caja_toma("mañana-1") + _caja_toma("mañana-2") + '</div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown('<div class="toma-slot-title">🌅 Tomas de la mañana</div>', unsafe_allow_html=True)
+                _slot_toma("mañana-1")
+                _slot_toma("mañana-2")
             with col_tt:
-                st.markdown(
-                    '<div class="toma-slot-title">🌇 Tomas de la tarde</div>'
-                    '<div class="tomas-wrap">' + _caja_toma("tarde-1") + _caja_toma("tarde-2") + '</div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown('<div class="toma-slot-title">🌇 Tomas de la tarde</div>', unsafe_allow_html=True)
+                _slot_toma("tarde-1")
+                _slot_toma("tarde-2")
             # Aclaración: si olvidó una toma, puede seguir (mínimo 12 tomas válidas para el informe)
             st.markdown(
                 '<div style="background:#eaf1fb;border-left:4px solid #2563eb;border-radius:8px;'
@@ -3292,53 +3314,13 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
             # Avisos de tomas fuera de protocolo / atrasadas (debajo de la carga y las tomas)
             render_avisos_atrasadas(mediciones, faltantes, tomas_orden, codigo, cerrado)
 
-        # Editor de tomas del día (editables solo si <12hs)
-        if med_dia:
-            with st.expander(f"✏️ Tomas cargadas hoy ({len(med_dia)}/4) — podés editar dentro de las 12hs"):
-                for m in med_dia:
-                    momento_disp = m["momento"].replace("mañana", "🌅 Mañana").replace("tarde", "🌇 Tarde").replace("-", " · Toma ")
-                    editable = puede_editar(m)
-                    pulso_disp = f"· {m.get('pulso','—')} lpm" if m.get("pulso") else ""
-                    edit_state_key = f"editando_{m['id']}"
-
-                    if st.session_state.get(edit_state_key):
-                        st.markdown(f"**Editando: {momento_disp}**")
-                        with st.form(f"form_edit_{m['id']}"):
-                            cE1, cE2, cE3 = st.columns(3)
-                            with cE1:
-                                sis_e = st.number_input("Sistólica", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{m['id']}")
-                            with cE2:
-                                dia_e = st.number_input("Diastólica", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{m['id']}")
-                            with cE3:
-                                pulso_e = st.number_input("Frecuencia cardíaca", min_value=30, max_value=220, value=int(m.get("pulso") or 70), step=1, key=f"e_pul_{m['id']}")
-                            cBE1, cBE2 = st.columns(2)
-                            with cBE1:
-                                ok_edit = st.form_submit_button("Guardar cambios", use_container_width=True)
-                            with cBE2:
-                                cancel_edit = st.form_submit_button("Cancelar", use_container_width=True)
-                        if ok_edit:
-                            if editar_medicion(m["id"], sis_e, dia_e, pulso=int(pulso_e)):
-                                st.success("✅ Toma actualizada.")
-                                del st.session_state[edit_state_key]
-                                st.rerun()
-                            else:
-                                st.error("No se pudo guardar la edición.")
-                        if cancel_edit:
-                            del st.session_state[edit_state_key]
-                            st.rerun()
-                    else:
-                        cL, cR = st.columns([4, 1])
-                        with cL:
-                            atrasada_lbl = " · ⚠️ atrasada" if m.get("cargada_atrasada") else ""
-                            editada_lbl = " · editada" if m.get("editada_at") else ""
-                            st.markdown(f"**{momento_disp}** — {m.get('sistolica')}/{m.get('diastolica')} mmHg {pulso_disp}{atrasada_lbl}{editada_lbl}")
-                        with cR:
-                            if editable:
-                                if st.button("✏️", key=f"btn_edit_{m['id']}", help="Editar esta toma", use_container_width=True):
-                                    st.session_state[edit_state_key] = True
-                                    st.rerun()
-                            else:
-                                st.caption("🔒 >12hs")
+        # Ver evolución hasta ahora (arriba de "Reportar un evento")
+        if not cerrado and total >= 2:
+            with st.expander("📈 Ver evolución hasta ahora"):
+                st.markdown("**Presión arterial**")
+                grafico_evolucion(mediciones)
+                st.markdown("**Frecuencia cardíaca**")
+                grafico_pulso(mediciones)
 
         # Reportar evento adverso / síntoma
         with st.expander("➕ Reportar un evento o síntoma"):

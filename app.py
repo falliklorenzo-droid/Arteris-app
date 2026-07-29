@@ -202,27 +202,32 @@ section[data-testid="stSidebar"] { display: none; }
 /* Header: los dos controles (Mi cuenta y Cerrar sesión) EXACTAMENTE con la misma altura.
    Se apunta a TODOS los botones dentro del contenedor con key para que no importe que sean
    componentes distintos (popover vs button). */
-.st-key-hdr_ctrls button,
-.st-key-hdr_ctrls [data-testid="stPopover"] button,
-.st-key-header_cerrar button {
+div.st-key-hdr_ctrls button,
+div.st-key-hdr_ctrls [data-testid="stPopover"] button,
+div.st-key-header_cerrar button {
     box-sizing: border-box !important;
     width: auto !important; min-width: 0 !important;
     height: 40px !important; min-height: 40px !important; max-height: 40px !important;
-    padding: 0 16px !important;
+    padding: 0 14px !important;
     font-size: 13px !important; font-weight: 500 !important;
     border: 1px solid #cbd5e1 !important; border-radius: 9px !important;
     background: #ffffff !important; color: #16233b !important;
     display: inline-flex !important; align-items: center !important; justify-content: center !important;
     gap: 6px !important; white-space: nowrap !important; line-height: 1 !important;
 }
-.st-key-hdr_ctrls button *,
-.st-key-header_cerrar button * {
-    font-size: 13px !important; white-space: nowrap !important; text-align: center !important;
-    line-height: 1 !important; margin: 0 !important;
+/* Texto interno idéntico en ambos botones (13px, mismo color) — alta especificidad para
+   ganarle a las reglas globales de botones y de markdown */
+div.st-key-hdr_ctrls button p, div.st-key-hdr_ctrls button span, div.st-key-hdr_ctrls button div,
+div.st-key-hdr_ctrls button [data-testid="stMarkdownContainer"] p,
+div.st-key-header_cerrar button p, div.st-key-header_cerrar button span,
+div.st-key-header_cerrar button [data-testid="stMarkdownContainer"] p {
+    font-size: 13px !important; font-weight: 500 !important; color: #16233b !important;
+    white-space: nowrap !important; text-align: center !important; line-height: 1 !important; margin: 0 !important;
 }
-.st-key-hdr_ctrls button [data-testid="stIconMaterial"],
-.st-key-header_cerrar button [data-testid="stIconMaterial"] {
-    font-size: 18px !important; width: 18px !important; height: 18px !important;
+/* Íconos Material idénticos (18px, mismo color) en ambos botones */
+div.st-key-hdr_ctrls button [data-testid="stIconMaterial"],
+div.st-key-header_cerrar button [data-testid="stIconMaterial"] {
+    font-size: 18px !important; width: 18px !important; height: 18px !important; color: #16233b !important;
 }
 
 /* Cards */

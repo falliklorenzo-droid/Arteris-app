@@ -199,14 +199,15 @@ section[data-testid="stSidebar"] { display: none; }
 .logo-tag { font-size: 11px; color: #8896a8; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; line-height: 1; }
 /* Barra de header con controles (vista paciente) */
 .header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
-/* Header: botones compactos, misma altura que el logo, texto en UNA línea y centrado */
+/* Header: botones compactos (ajustados al contenido), texto chico y centrado */
 [data-testid="stPopover"] > button, .st-key-header_cerrar button {
-    height: 50px !important; min-height: 50px !important;
-    padding: 0 12px !important;
+    width: auto !important; min-width: 0 !important;
+    height: 38px !important; min-height: 38px !important;
+    padding: 0 14px !important;
     font-size: 13px !important; font-weight: 500 !important;
-    border-radius: 10px !important;
+    border-radius: 9px !important;
     display: inline-flex !important; align-items: center !important; justify-content: center !important;
-    white-space: nowrap !important; line-height: 1 !important;
+    gap: 6px !important; white-space: nowrap !important; line-height: 1 !important;
 }
 [data-testid="stPopover"] > button *, .st-key-header_cerrar button * {
     font-size: 13px !important; white-space: nowrap !important; text-align: center !important;
@@ -2751,23 +2752,23 @@ elif st.session_state.vista == "paciente_home":
     codigo = paciente["codigo"]
     nombre = paciente.get("nombre", "Paciente")
 
-    # Header en una sola barra: logo + Mi cuenta + Cerrar sesión
-    h_logo, h_tools, h_logout = st.columns([7, 1.5, 1.7], vertical_alignment="center")
+    # Header en una sola barra: logo a la izquierda, controles compactos a la derecha
+    h_logo, h_right = st.columns([5, 4], vertical_alignment="center")
     with h_logo:
         st.markdown(logo_markup(), unsafe_allow_html=True)
-    with h_tools:
-        with st.popover("⚙️ Mi cuenta", use_container_width=True):
-            st.markdown(f'<p style="font-size:13px;color:#5a6b82;margin-bottom:8px;">Sesión activa como<br><strong style="color:#16233b;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
-            st.divider()
-            if st.button("⚙️ Ajustes", use_container_width=True, key="pop_home_ajustes"):
-                st.session_state.vista = "paciente_ajustes"
-                st.rerun()
-            if st.button("📚 Historial", use_container_width=True, key="pop_home_historial"):
-                st.session_state.vista = "paciente_historial"
-                st.rerun()
-    with h_logout:
-        if st.button("🚪 Cerrar sesión", use_container_width=True, type="secondary", key="header_cerrar"):
-            cerrar_sesion()
+    with h_right:
+        with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
+            with st.popover("⚙️ Mi cuenta"):
+                st.markdown(f'<p style="font-size:13px;color:#5a6b82;margin-bottom:8px;">Sesión activa como<br><strong style="color:#16233b;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
+                st.divider()
+                if st.button("⚙️ Ajustes", use_container_width=True, key="pop_home_ajustes"):
+                    st.session_state.vista = "paciente_ajustes"
+                    st.rerun()
+                if st.button("📚 Historial", use_container_width=True, key="pop_home_historial"):
+                    st.session_state.vista = "paciente_historial"
+                    st.rerun()
+            if st.button("🚪 Cerrar sesión", type="secondary", key="header_cerrar"):
+                cerrar_sesion()
     st.markdown('<div class="header-underline"></div>', unsafe_allow_html=True)
 
     # Consentimiento

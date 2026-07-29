@@ -199,22 +199,28 @@ section[data-testid="stSidebar"] { display: none; }
 .logo-tag { font-size: 11px; color: #8896a8; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; line-height: 1; }
 /* Barra de header con controles (vista paciente) */
 .header-underline { height: 2px; border-radius: 2px; margin: 4px 0 18px; background: linear-gradient(90deg,#1e3a8a,#2563eb,#dc2626,transparent); }
-/* Header: botones compactos (ajustados al contenido), texto chico y centrado */
-[data-testid="stPopover"] > button, .st-key-header_cerrar button {
+/* Header: los dos controles (Mi cuenta y Cerrar sesión) EXACTAMENTE con la misma altura.
+   Se apunta a TODOS los botones dentro del contenedor con key para que no importe que sean
+   componentes distintos (popover vs button). */
+.st-key-hdr_ctrls button,
+.st-key-hdr_ctrls [data-testid="stPopover"] button,
+.st-key-header_cerrar button {
+    box-sizing: border-box !important;
     width: auto !important; min-width: 0 !important;
-    height: 38px !important; min-height: 38px !important;
-    padding: 0 14px !important;
+    height: 40px !important; min-height: 40px !important; max-height: 40px !important;
+    padding: 0 16px !important;
     font-size: 13px !important; font-weight: 500 !important;
-    border-radius: 9px !important;
+    border: 1px solid #cbd5e1 !important; border-radius: 9px !important;
+    background: #ffffff !important; color: #16233b !important;
     display: inline-flex !important; align-items: center !important; justify-content: center !important;
     gap: 6px !important; white-space: nowrap !important; line-height: 1 !important;
 }
-[data-testid="stPopover"] > button *, .st-key-header_cerrar button * {
+.st-key-hdr_ctrls button *,
+.st-key-header_cerrar button * {
     font-size: 13px !important; white-space: nowrap !important; text-align: center !important;
     line-height: 1 !important; margin: 0 !important;
 }
-/* Los íconos Material del header no se achican con el texto */
-[data-testid="stPopover"] > button [data-testid="stIconMaterial"],
+.st-key-hdr_ctrls button [data-testid="stIconMaterial"],
 .st-key-header_cerrar button [data-testid="stIconMaterial"] {
     font-size: 18px !important; width: 18px !important; height: 18px !important;
 }
@@ -2762,7 +2768,7 @@ elif st.session_state.vista == "paciente_home":
     with h_logo:
         st.markdown(logo_markup(), unsafe_allow_html=True)
     with h_right:
-        with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
+        with st.container(horizontal=True, horizontal_alignment="right", gap="small", key="hdr_ctrls"):
             with st.popover("Mi cuenta", icon=":material/settings:"):
                 st.markdown(f'<p style="font-size:13px;color:#5a6b82;margin-bottom:8px;">Sesión activa como<br><strong style="color:#16233b;">{nombre} {paciente.get("apellido","")}</strong></p>', unsafe_allow_html=True)
                 st.divider()

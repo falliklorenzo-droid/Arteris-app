@@ -3293,29 +3293,27 @@ Los datos se almacenan de forma segura y cifrada. No se comparten con terceros b
                 ekey = f"editando_{mid}"
                 pl = f" · {m.get('pulso')} lpm" if m.get("pulso") else ""
                 with st.container(border=True, key=f"tomabox_{mid}"):
-                    izq, der = st.columns([5, 3], vertical_alignment="center")
-                    with izq:
+                    # Opción B: valor a la izquierda; "Completado" + lápiz juntos a la derecha, misma línea
+                    c_val, c_badge, c_pen = st.columns([5, 2.3, 0.9], vertical_alignment="center", gap="small")
+                    with c_val:
                         st.markdown(
                             f'<div class="toma-label">{etiquetas_toma[momento]}</div>'
                             f'<div class="toma-val">{m.get("sistolica")}/{m.get("diastolica")} <small>mmHg{pl}</small></div>',
                             unsafe_allow_html=True,
                         )
-                    with der:
-                        with st.container(horizontal=True, horizontal_alignment="right", gap="small"):
-                            st.markdown('<span class="toma-check">✓ Completado</span>', unsafe_allow_html=True)
-                            if puede_editar(m):
-                                if st.button(":material/edit:", key=f"btn_edit_grid_{mid}", type="tertiary", help="Editar esta toma"):
-                                    st.session_state[ekey] = not st.session_state.get(ekey, False)
-                                    st.rerun()
+                    with c_badge:
+                        st.markdown('<div style="text-align:right;"><span class="toma-check">✓ Completado</span></div>', unsafe_allow_html=True)
+                    with c_pen:
+                        if puede_editar(m):
+                            if st.button(":material/edit:", key=f"btn_edit_grid_{mid}", type="tertiary", help="Editar esta toma"):
+                                st.session_state[ekey] = not st.session_state.get(ekey, False)
+                                st.rerun()
                     if st.session_state.get(ekey):
                         with st.form(f"form_edit_{mid}"):
-                            e1, e2, e3 = st.columns(3)
-                            with e1:
-                                sis_e = st.number_input("Sistólica", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")
-                            with e2:
-                                dia_e = st.number_input("Diastólica", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{mid}")
-                            with e3:
-                                pul_e = st.number_input("Frec. cardíaca", min_value=30, max_value=220, value=int(m.get("pulso") or 80), step=1, key=f"e_pul_{mid}")
+                            # Apilados (a lo ancho) para que aparezcan los botones + / −
+                            sis_e = st.number_input("Sistólica (mayor)", min_value=60, max_value=250, value=int(m.get("sistolica") or 120), step=1, key=f"e_sis_{mid}")
+                            dia_e = st.number_input("Diastólica (menor)", min_value=40, max_value=150, value=int(m.get("diastolica") or 80), step=1, key=f"e_dia_{mid}")
+                            pul_e = st.number_input("Frecuencia cardíaca (lpm)", min_value=30, max_value=220, value=int(m.get("pulso") or 80), step=1, key=f"e_pul_{mid}")
                             b1, b2 = st.columns(2)
                             with b1:
                                 ok_e = st.form_submit_button("Guardar", use_container_width=True)
